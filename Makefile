@@ -1,9 +1,9 @@
-SCHEME=scheme --libdirs nanopass-framework-scheme
+SCHEME=scheme --compile-imported-libraries --libdirs nanopass-framework-scheme:thunderchez
 
 snippet:
 	$(SCHEME) --script snippet.scm
 
 scheme:
-	$(SCHEME)
+	$(SCHEME) silly-actor.scm
 
 .PHONY: snippet scheme
