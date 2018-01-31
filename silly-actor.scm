@@ -1,7 +1,7 @@
 (import (matchable) (nanopass))
 
 (define verbs
-  '(match stop spawn send become actor stay self from parent))
+  '(match stop spawn send become actor stay self from parent list))
 
 (define (verb? x) (list? (member x verbs)))
 (define (atom? x)
@@ -33,49 +33,56 @@
     wp
     '()
     (p* ...))
-  (Expr (e)
+  (Value (v)
     a
     n
-    ua
+    (actor (p) m* ...)
+    '()
+    (v* ...))
+  (Expr (e)
+    v
     (become e0 e1)
     (stay e)
     (spawn e0 e1)
     (send e0 e1)
     (stop)
     (self)
-    '()
-    (e* ...))
+    (list e* ...))
   (MsgCase (m) (p e))
-  (UnnamedActor (ua) (actor (p) m* ...))
   (ActorDef (ad) (define (a p) m* ...))
-  (Options (o) (init a))
+  (Options (o) (init a v))
   (System (t) (system (o* ...) ad* ...)))
 
 (define-parser parse-Lsrc Lsrc)
 
 (define-pass output-scheme : Lsrc (e) -> * ()
-  (ActorDef : ActorDef (ad ds) -> * ()
+  (Value : Value (v) -> * ()
+    [,a a]
+    [,n n]
+    ['() '()]
+    [(actor (,p) ,m* ...) (void)]
+    [(,v* ...) (map Value v*)])
+  (ActorDef : ActorDef (ad) -> * ()
     [(define (,a ,p) ,m* ...)
-     (hashtable-set! ds a
-       (lambda (self parent state from msg)
-         (printf "self:~s parent:~s state:~s from:~s: msg:~s\n"
-                 self parent state from msg)
-         ))])
+     `(cons ',a (lambda (self parent state from msg)
+              (printf "self:~s parent:~s state:~s from:~s: msg:~s\n"
+                      self parent state from msg)
+              ))])
   (Options : Options (o) -> * ()
-    [(init ,a) `(init ,a)])
+    [(init ,a ,v) `(init ,a ,(Value v))])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
-     (let ([ads (make-eqv-hashtable)])
-       (for-each (lambda (ad) (ActorDef ad ads)) ad*)
-       (make-system
-         (map Options o*)
-         (empty-queue)
-         ads
-         (make-eqv-hashtable)
-         (box 0)))]))
+     `(let ([env ,(cons 'list  (map ActorDef ad*))])
+        (run-system
+          (make-system
+            ',(map Options o*)
+            (empty-queue)
+            env
+            (make-eqv-hashtable)
+            (box 0))))]))
 
 (define-record-type system
-  (fields options inbox actor-defs actors actor-counter))
+  (fields options inbox env actors actor-counter))
 (define-record-type actor (fields parent f state))
 
 (define (ni what) (error what "not implemented"))
@@ -95,8 +102,11 @@
 
 (define (run-system s)
   (let*
-    ([get-actor-def
-       (lambda (a) (hashtable-ref (system-actor-defs s) a (void)))]
+    ([lookup
+       (lambda (a env)
+         (cond
+           [(assv a env) => (lambda (v) (cdr v))]
+           [else (error 'lookup "unbound" a)]))]
      [fresh-actor-id
        (lambda () (let* ([b (system-actor-counter s)]
                          [c (unbox b)])
@@ -115,12 +125,12 @@
      )
     (for-each (lambda (o)
                 (match o
-                  [('init a)
+                  [('init a v)
                    (spawn-actor
                      'root
                      (fresh-actor-id)
-                     (get-actor-def a)
-                     'TODO)]
+                     (lookup a (system-env s))
+                     v)]
                   [else (void)]))
               (system-options s))
     (call/cc (lambda (k)
