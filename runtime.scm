@@ -155,7 +155,9 @@
            [output-port (current-output-port)])
       (hashtable-set! (as-actors s) 'root root)
 
-      (root-actor 'output (lambda (ctx env) (write (ctx-msg ctx) output-port)))
+      (root-actor 'output
+        (lambda (ctx env)
+          (write (list (ctx-msg ctx)) output-port)))
 
       (for-each (lambda (o)
                   (cond

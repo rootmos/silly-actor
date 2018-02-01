@@ -38,16 +38,16 @@
   (let ([code (output-scheme (parse-Lsrc x))])
     (eval code (environment '(scheme) '(runtime)))))
 
-(define (test code expect)
+(define (test code expected)
   (let ([str (call-with-string-output-port (lambda (p) (interp (code p))))])
     (with-input-from-string str (lambda ()
-      (assert (equal?
-        (reverse (let go ([acc '()])
-                   (let ([o (read)])
-                     (cond
-                       [(eqv? o (eof-object)) acc]
-                       [else (go (cons (eval o) acc))]))))
-        expect))))))
+      (let ([actual (reverse (let go ([acc '()])
+                               (let ([o (read)])
+                                 (cond
+                                   [(eqv? o (eof-object)) acc]
+                                   [else (go (cons o acc))]))))])
+        (printf "actual:~s expected:~s\n" actual expected)
+        (assert (equal? actual expected)))))))
 
 (test
   (lambda (p)
@@ -55,4 +55,14 @@
        [(init main '()) (output-port ,p)]
        (define (main)
          [_ (output (state))])))
-  '(()))
+  '(('())))
+
+(test
+  (lambda (p)
+    `(system
+       [(init main '()) (output-port ,p)]
+       (define (main)
+         [_ (seq
+              (output (value 1))
+              (output (value 2)))])))
+  '((1) (2)))

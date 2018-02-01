@@ -1,7 +1,8 @@
 (import (matchable) (nanopass))
 
 (define verbs
-  '(match stop spawn send become actor stay from parent list state self output))
+  '(match stop spawn send become actor stay
+    from parent list state self output seq))
 
 (define (verb? x) (list? (member x verbs)))
 (define (atom? x)
@@ -52,6 +53,7 @@
     (from)
     (state)
     (output e)
+    (seq e* ...)
     (list e* ...))
   (MatchArm (ma) (p e))
   (ActorDef (ad) (define (a) ma* ...))
@@ -118,6 +120,11 @@
     [(output ,e)
      (let ([v (fresh-anf-var)])
        `(>>= ,(Expr e) (lambda (,v) (sendM 'output ,v))))]
+    [(seq ,e* ...)
+     (let go ([es e*])
+       (cond
+         [(equal? (length es) 1) (Expr (car es))]
+         [else `(>> ,(Expr (car es)) ,(go (cdr es)))]))]
     [(stop) 'stopM]
     [(from) 'fromM]
     [(self) 'selfM]
