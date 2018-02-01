@@ -40,8 +40,14 @@
 
 (define (test code expect)
   (let ([str (call-with-string-output-port (lambda (p) (interp (code p))))])
-    (with-input-from-string str
-      (lambda () (assert (eqv? (eval (read)) expect))))))
+    (with-input-from-string str (lambda ()
+      (assert (equal?
+        (reverse (let go ([acc '()])
+                   (let ([o (read)])
+                     (cond
+                       [(eqv? o (eof-object)) acc]
+                       [else (go (cons (eval o) acc))]))))
+        expect))))))
 
 (test
   (lambda (p)
@@ -49,4 +55,4 @@
        [(init main '()) (output-port ,p)]
        (define (main)
          [_ (output (state))])))
-  '())
+  '(()))
