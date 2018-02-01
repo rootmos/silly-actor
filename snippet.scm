@@ -21,16 +21,16 @@
 (define sample
   '(system
      [(init main 0) (init empty '())]
-     (define (main s)
-       [(msg1 ,x) (become empty '())]
-       [(msg2 ,z) (spawn aux 2)]
+     (define (main)
+       [(var x) (become (var empty) (value '()))]
+       [((atom msg2) (var z)) (spawn (var aux) (value 2))]
        [_ (stop)])
-     (define (empty _))
-     (define (aux s)
-       [1 (become (actor (_) (x (stop))) x)]
-       ['() (stay x)]
-       [3 (send (self) 2)]
-       [_ (stay x)])
+     (define (empty))
+     (define (aux)
+       [1 (become (value (actor ((var x) (stop)))) (var x))]
+       ['() (stay (var x))]
+       [3 (send (self) (value 2))]
+       [_ (stay (var x))])
      ))
 
 (define sample-system (output-scheme (parse-Lsrc sample)))

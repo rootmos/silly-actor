@@ -1,7 +1,7 @@
 (import (matchable) (nanopass))
 
 (define verbs
-  '(match stop spawn send become actor stay self from parent list))
+  '(match stop spawn send become actor stay from parent list state self))
 
 (define (verb? x) (list? (member x verbs)))
 (define (atom? x)
@@ -11,7 +11,8 @@
     [char-lower-case? (car (string->list (symbol->string x)))]
     [not (equal? (substring (symbol->string x) 0 1) "_")]
     ))
-(define (variable-pattern? x) (match x [('unquote s) (atom? s)] [else #f]))
+(define (variable-pattern? x)
+  (match x [('unquote s) (atom? s)] [else #f]))
 (define (wildcard-pattern? x)
   (and
     [symbol? x]
@@ -23,67 +24,103 @@
   (terminals
     (atom (a))
     (number (n))
-    (variable-pattern (vp))
+    ;(variable-pattern (vp))
     (wildcard-pattern (wp)))
   (entry System)
   (Pattern (p)
-    a
+    (atom a)
     n
-    vp
+    (var a)
     wp
     '()
     (p* ...))
   (Value (v)
-    a
+    (atom a)
     n
-    (actor (p) m* ...)
+    (actor ma* ...)
     '()
     (v* ...))
   (Expr (e)
-    v
+    (value v)
+    (var a)
     (become e0 e1)
     (stay e)
     (spawn e0 e1)
     (send e0 e1)
     (stop)
     (self)
+    (from)
+    (state)
     (list e* ...))
-  (MsgCase (m) (p e))
-  (ActorDef (ad) (define (a p) m* ...))
+  (MatchArm (ma) (p e))
+  (ActorDef (ad) (define (a) ma* ...))
   (Options (o) (init a v))
   (System (t) (system (o* ...) ad* ...)))
 
 (define-parser parse-Lsrc Lsrc)
 
 (define-pass output-scheme : Lsrc (e) -> * ()
+  (definitions
+    (define anf-counter 0)
+    (define fresh-anf-var
+      (lambda ()
+        (let* ([c anf-counter]
+               [s (string->symbol (format "_anf-~s" c))])
+          (set! anf-counter (+ c 1))
+          s)))
+    (define mk-actor
+      (lambda (ma*)
+        `(>>= msgM (pattern-matchM ,(cons 'list (map MatchArm ma*))))))
+    )
   (Value : Value (v) -> * ()
-    [,a 'a]
+    [(atom ,a) `'(atom . ,a)]
     [,n n]
-    ['() '()]
-    [(actor (,p) ,m* ...) (void)]
-    [(,v* ...) (map Value v*)])
+    ['() ''()]
+    [(actor ,ma* ...) (mk-actor ma*)]
+    [(,v* ...) (cons 'list (map Value v*))])
   (Pattern : Pattern (p) -> * ()
-    [,a `'(atom ,a)]
-    [,n `(number ,n)] 
-    ['() '(nil)]
-    [,vp `(bind ,(cadr vp))]
+    [(atom ,a) `'(atom . ,a)]
+    [,n `,n]
+    ['() ''()]
+    [(var ,a) `'(var . ,a)]
     [,wp ''wildcard]
-    [(,p* ...) (map Pattern p*)])
+    [(,p* ...) (cons 'list (map Pattern p*))])
   (Expr : Expr (e) -> * ()
-    [,v (Value v)]
-    [(become ,e0 ,e1) (list 'become (Expr e0) (Expr e1))]
-    [(stay ,e) (list 'stay (Expr e))]
-    [(spawn ,e0 ,e1) (list 'spawn (Expr e0) (Expr e1))]
-    [(send ,e0 ,e1) (list 'send (Expr e0) (Expr e1))]
-    [(stop) '(stop)]
-    [(self) '(self)]
+    [(value ,v) (list 'point (Value v))]
+    [(var ,a) `(lookupM ',a)]
+    [(become ,e0 ,e1)
+     (let ([v0 (fresh-anf-var)] [v1 (fresh-anf-var)])
+       `(>>= ,(Expr e0)
+             (lambda (,v0)
+               (>>= ,(Expr e1)
+                    (lambda (,v1)
+                      (becomeM ,v0 ,v1))))))]
+    [(stay ,e)
+     (let ([v0 (fresh-anf-var)])
+       `(>>= ,(Expr e) stayM))]
+    [(spawn ,e0 ,e1)
+     (let ([v0 (fresh-anf-var)] [v1 (fresh-anf-var)])
+       `(>>= ,(Expr e0)
+             (lambda (,v0)
+               (>>= ,(Expr e1)
+                    (lambda (,v1)
+                      (spawnM ,v0 ,v1))))))]
+    [(send ,e0 ,e1)
+     (let ([v0 (fresh-anf-var)] [v1 (fresh-anf-var)])
+       `(>>= ,(Expr e0)
+             (lambda (,v0)
+               (>>= ,(Expr e1)
+                    (lambda (,v1)
+                      (sendM ,v0 ,v1))))))]
+    [(stop) 'stopM]
+    [(from) 'fromM]
+    [(self) 'selfM]
+    [(state) 'stateM]
     [(list ,e* ...) (cons 'list (map Expr e*))])
+  (MatchArm : MatchArm (ma) -> * ()
+    [(,p ,e) `(cons ,(Pattern p) ,(Expr e))])
   (ActorDef : ActorDef (ad) -> * ()
-    [(define (,a ,p) ,m* ...)
-     `(cons ',a (lambda (self from msg)
-              (pattern-match (actor-state self) ,(Pattern p))
-              (printf "self:~s from:~s msg:~s\n" (actor-id self) from msg)
-              ))])
+    [(define (,a) ,ma* ...) `(cons ',a ,(mk-actor ma*))])
   (Options : Options (o) -> * ()
     [(init ,a ,v) `(init ,a ,(Value v))])
   (System : System (s) -> * ()
