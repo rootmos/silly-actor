@@ -45,7 +45,7 @@
   (define (deliver-message s)
     (let* ([m (dequeue (as-inbox s))]
            [to (car m)] [from (cadr m)] [msg (caddr m)])
-      (cond 
+      (cond
         [(hashtable-ref (as-actors s) to #f) => (lambda (a)
            (printf "delivering message:~s to:~s from:~s\n" msg to from)
            (call/cc (lambda (k) ((a-f a) (make-ctx a k from msg) (a-env a)))))]
@@ -147,16 +147,27 @@
 
   (define (run-system os root-env)
     (let* ([s (make-as (empty-queue) (make-eqv-hashtable) (box 0) root-env)]
-           [root (make-a 'root 'root (lambda (ctx env) (void)) '() s root-env)])
+           [root (make-a 'root 'root (lambda (ctx env) (void)) '() s root-env)]
+           [root-actor (lambda (id f)
+                         (hashtable-set!
+                           (as-actors s) id
+                           (make-a id 'root f '() s root-env)))]
+           [output-port (current-output-port)])
+      (hashtable-set! (as-actors s) 'root root)
+
+      (root-actor 'output (lambda (ctx env) (write (ctx-msg ctx) output-port)))
+
       (for-each (lambda (o)
                   (cond
-                    [(and (list? o) (not (null? o)) (eqv? (car o) 'init))
+                    [(and (eqv? (car o) 'init))
                      (let ([a (cadr o)] [v (caddr o)])
                        (spawn-actor
-                         root
+                         (hashtable-ref (as-actors s) 'root #f)
                          (lookup a root-env)
                          v
                          root-env))]
+                    [(and (eqv? (car o) 'output-port))
+                     (set! output-port (cadr o))]
                     [else (void)])) os)
       (call/cc (lambda (k)
                  (let go ()

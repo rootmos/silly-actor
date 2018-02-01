@@ -1,7 +1,7 @@
 (import (matchable) (nanopass))
 
 (define verbs
-  '(match stop spawn send become actor stay from parent list state self))
+  '(match stop spawn send become actor stay from parent list state self output))
 
 (define (verb? x) (list? (member x verbs)))
 (define (atom? x)
@@ -24,8 +24,8 @@
   (terminals
     (atom (a))
     (number (n))
-    ;(variable-pattern (vp))
-    (wildcard-pattern (wp)))
+    (wildcard-pattern (wp))
+    (output-port (op)))
   (entry System)
   (Pattern (p)
     (atom a)
@@ -51,10 +51,13 @@
     (self)
     (from)
     (state)
+    (output e)
     (list e* ...))
   (MatchArm (ma) (p e))
   (ActorDef (ad) (define (a) ma* ...))
-  (Options (o) (init a v))
+  (Options (o)
+    (init a v)
+    (output-port op))
   (System (t) (system (o* ...) ad* ...)))
 
 (define-parser parse-Lsrc Lsrc)
@@ -112,6 +115,9 @@
                (>>= ,(Expr e1)
                     (lambda (,v1)
                       (sendM ,v0 ,v1))))))]
+    [(output ,e)
+     (let ([v (fresh-anf-var)])
+       `(>>= ,(Expr e) (lambda (,v) (sendM 'output ,v))))]
     [(stop) 'stopM]
     [(from) 'fromM]
     [(self) 'selfM]
@@ -122,7 +128,8 @@
   (ActorDef : ActorDef (ad) -> * ()
     [(define (,a) ,ma* ...) `(cons ',a ,(mk-actor ma*))])
   (Options : Options (o) -> * ()
-    [(init ,a ,v) `(init ,a ,(Value v))])
+    [(init ,a ,v) `(init ,a ,(Value v))]
+    [(output-port ,op) `(output-port ,op)])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
      `(run-system
