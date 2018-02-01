@@ -30,8 +30,9 @@
        [1 (become (actor (_) (x (stop))) x)]
        ['() (stay x)]
        [3 (send (self) 2)]
-       [_ (stay x)])))
+       [_ (stay x)])
+     ))
 
 (define sample-system (output-scheme (parse-Lsrc sample)))
 (pretty-print sample-system)
-(eval sample-system)
+(eval sample-system (environment '(scheme) '(runtime)))

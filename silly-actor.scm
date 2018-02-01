@@ -57,86 +57,37 @@
 
 (define-pass output-scheme : Lsrc (e) -> * ()
   (Value : Value (v) -> * ()
-    [,a a]
+    [,a 'a]
     [,n n]
     ['() '()]
     [(actor (,p) ,m* ...) (void)]
     [(,v* ...) (map Value v*)])
+  (Pattern : Pattern (p) -> * ()
+    [,a `'(atom ,a)]
+    [,n `(number ,n)] 
+    ['() '(nil)]
+    [,vp `(bind ,(cadr vp))]
+    [,wp ''wildcard]
+    [(,p* ...) (map Pattern p*)])
+  (Expr : Expr (e) -> * ()
+    [,v (Value v)]
+    [(become ,e0 ,e1) (list 'become (Expr e0) (Expr e1))]
+    [(stay ,e) (list 'stay (Expr e))]
+    [(spawn ,e0 ,e1) (list 'spawn (Expr e0) (Expr e1))]
+    [(send ,e0 ,e1) (list 'send (Expr e0) (Expr e1))]
+    [(stop) '(stop)]
+    [(self) '(self)]
+    [(list ,e* ...) (cons 'list (map Expr e*))])
   (ActorDef : ActorDef (ad) -> * ()
     [(define (,a ,p) ,m* ...)
-     `(cons ',a (lambda (self parent state from msg)
-              (printf "self:~s parent:~s state:~s from:~s: msg:~s\n"
-                      self parent state from msg)
+     `(cons ',a (lambda (self from msg)
+              (pattern-match (actor-state self) ,(Pattern p))
+              (printf "self:~s from:~s msg:~s\n" (actor-id self) from msg)
               ))])
   (Options : Options (o) -> * ()
     [(init ,a ,v) `(init ,a ,(Value v))])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
-     `(let ([env ,(cons 'list  (map ActorDef ad*))])
-        (run-system
-          (make-system
-            ',(map Options o*)
-            (empty-queue)
-            env
-            (make-eqv-hashtable)
-            (box 0))))]))
-
-(define-record-type system
-  (fields options inbox env actors actor-counter))
-(define-record-type actor (fields parent f state))
-
-(define (ni what) (error what "not implemented"))
-
-(define-record-type queue (fields (mutable head) (mutable tail)))
-(define (empty-queue) (let ([q (box '())]) (make-queue q q)))
-(define (enqueue q x)
-  (let ([t (queue-tail q)] [nt (box '())])
-    (set-box! t `(,x . ,nt))
-    (queue-tail-set! q nt)))
-(define (dequeue q)
-  (let* ([hb (queue-head q)] [h (unbox hb)] )
-    (case h
-      ['() (error 'dequeue "empty queue" q)]
-      [else (queue-head-set! q (cdr h)) (car h)])))
-(define (queue-empty? q) (null? (unbox (queue-head q))))
-
-(define (run-system s)
-  (let*
-    ([lookup
-       (lambda (a env)
-         (cond
-           [(assv a env) => (lambda (v) (cdr v))]
-           [else (error 'lookup "unbound" a)]))]
-     [fresh-actor-id
-       (lambda () (let* ([b (system-actor-counter s)]
-                         [c (unbox b)])
-                    (set-box! b (+ c 1)) c))]
-     [send-message
-       (lambda (id from msg) (enqueue (system-inbox s) `(,id ,from ,msg)))]
-     [deliver-message
-       (lambda ()
-         (match (dequeue (system-inbox s))
-           [(id from msg)
-            (let ([a (hashtable-ref (system-actors s) id (void))])
-              ((actor-f a) id (actor-parent a) (actor-state a) from msg))]))]
-     [spawn-actor (lambda (p id f st)
-                    (hashtable-set! (system-actors s) id (make-actor p f st))
-                    (send-message id 'root 'Init))]
-     )
-    (for-each (lambda (o)
-                (match o
-                  [('init a v)
-                   (spawn-actor
-                     'root
-                     (fresh-actor-id)
-                     (lookup a (system-env s))
-                     v)]
-                  [else (void)]))
-              (system-options s))
-    (call/cc (lambda (k)
-               (let go ()
-                 (if (queue-empty? (system-inbox s)) (k)
-                   (begin
-                     (deliver-message)
-                     (go))))))
-    (printf "system stopped\n")))
+     `(run-system
+        ',(map Options o*)
+        ,(cons 'list  (map ActorDef (reverse ad*))))]))
