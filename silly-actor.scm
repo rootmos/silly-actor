@@ -1,14 +1,23 @@
 (import (matchable) (nanopass))
 
-(define verbs
-  '(match stop spawn send become actor stay
-    from parent list state self output seq))
+(define primfuns
+  '((stop 0 stopM)
+    (spawn 2 spawnM)
+    (send 2 sendM)
+    (become 2 becomeM)
+    (stay 1 stayM)
+    (from 0 fromM)
+    (parent 0 parentM)
+    (state 0 stateM)
+    (self 0 selfM)
+    (output 1 outputM)))
 
-(define (verb? x) (list? (member x verbs)))
+(define (primfun? x) (list? (member x (map car primfuns))))
+
 (define (atom? x)
   (and
     [symbol? x]
-    [not (verb? x)]
+    [not (primfun? x)]
     [char-lower-case? (car (string->list (symbol->string x)))]
     [not (equal? (substring (symbol->string x) 0 1) "_")]
     ))
@@ -26,33 +35,27 @@
     (atom (a))
     (number (n))
     (wildcard-pattern (wp))
+    (primfun (pf))
     (output-port (op)))
   (entry System)
   (Pattern (p)
     (atom a)
-    n
+    (number n)
     (var a)
     wp
     '()
-    (p* ...))
+    (list p* ...))
   (Value (v)
     (atom a)
-    n
+    (number n)
     (actor ma* ...)
     '()
-    (v* ...))
+    (list v* ...))
   (Expr (e)
     (value v)
     (var a)
-    (become e0 e1)
-    (stay e)
-    (spawn e0 e1)
-    (send e0 e1)
-    (stop)
-    (self)
-    (from)
-    (state)
-    (output e)
+    (pf)
+    (pf e* ...)
     (seq e* ...)
     (list e* ...))
   (MatchArm (ma) (p e))
@@ -79,56 +82,58 @@
     )
   (Value : Value (v) -> * ()
     [(atom ,a) `'(atom . ,a)]
-    [,n n]
-    ['() ''()]
+    [(number ,n) `'(number . ,n)]
     [(actor ,ma* ...) (mk-actor ma*)]
-    [(,v* ...) (cons 'list (map Value v*))])
+    ['() ''()]
+    [(list ,v* ...) (cons 'list (map Value v*))])
   (Pattern : Pattern (p) -> * ()
     [(atom ,a) `'(atom . ,a)]
-    [,n `,n]
-    ['() ''()]
+    [(number ,n) `'(number . ,n)]
     [(var ,a) `'(var . ,a)]
     [,wp ''wildcard]
-    [(,p* ...) (cons 'list (map Pattern p*))])
+    ['() ''()]
+    [(list ,p* ...) (cons 'list (map Pattern p*))])
   (Expr : Expr (e) -> * ()
     [(value ,v) (list 'point (Value v))]
     [(var ,a) `(lookupM ',a)]
-    [(become ,e0 ,e1)
-     (let ([v0 (fresh-anf-var)] [v1 (fresh-anf-var)])
-       `(>>= ,(Expr e0)
-             (lambda (,v0)
-               (>>= ,(Expr e1)
-                    (lambda (,v1)
-                      (becomeM ,v0 ,v1))))))]
-    [(stay ,e)
-     (let ([v0 (fresh-anf-var)])
-       `(>>= ,(Expr e) stayM))]
-    [(spawn ,e0 ,e1)
-     (let ([v0 (fresh-anf-var)] [v1 (fresh-anf-var)])
-       `(>>= ,(Expr e0)
-             (lambda (,v0)
-               (>>= ,(Expr e1)
-                    (lambda (,v1)
-                      (spawnM ,v0 ,v1))))))]
-    [(send ,e0 ,e1)
-     (let ([v0 (fresh-anf-var)] [v1 (fresh-anf-var)])
-       `(>>= ,(Expr e0)
-             (lambda (,v0)
-               (>>= ,(Expr e1)
-                    (lambda (,v1)
-                      (sendM ,v0 ,v1))))))]
-    [(output ,e)
-     (let ([v (fresh-anf-var)])
-       `(>>= ,(Expr e) (lambda (,v) (sendM 'output ,v))))]
+    [(,pf)
+     (cond
+       [(assv pf primfuns)
+        => (lambda (l)
+             (cond
+               [(= 0 (cadr l)) (caddr l)]
+               [else
+                 (error
+                   'output-scheme
+                   "non-nullary primitive function applied without arguments"
+                   pf)]))]
+       [else (error 'output-scheme "unsupported nullary primitive function"
+                    pf)])]
+    [(,pf ,e* ...)
+     (cond
+       [(assv pf primfuns)
+        => (lambda (l)
+             (cond
+               [(= (length e*) (cadr l))
+                (let anf ([es e*] [vs '()])
+                  (cond
+                    [(null? es) (cons (caddr l) (reverse vs))]
+                    [else
+                      (let ([v (fresh-anf-var)])
+                        `(>>=
+                           ,(Expr (car es))
+                           (lambda (,v) ,(anf (cdr es) (cons v vs)))))]))]
+               [else
+                 (error
+                   'output-scheme
+                   "primitive function applied with wrong number of arguments"
+                   pf)]))]
+       [else (error 'output-scheme "unsupported primitive function" pf)])]
     [(seq ,e* ...)
      (let go ([es e*])
        (cond
          [(equal? (length es) 1) (Expr (car es))]
          [else `(>> ,(Expr (car es)) ,(go (cdr es)))]))]
-    [(stop) 'stopM]
-    [(from) 'fromM]
-    [(self) 'selfM]
-    [(state) 'stateM]
     [(list ,e* ...) (cons 'list (map Expr e*))])
   (MatchArm : MatchArm (ma) -> * ()
     [(,p ,e) `(cons ,(Pattern p) ,(Expr e))])

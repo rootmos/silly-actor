@@ -3,7 +3,7 @@
           >>= >> point
           stateM msgM fromM selfM
           lookupM
-          becomeM spawnM sendM stopM stayM
+          becomeM spawnM sendM stopM stayM outputM
           run-system)
   (import (chezscheme))
 
@@ -145,6 +145,11 @@
         (remove-actor a)
         ((ctx-k ctx)))))
 
+  (define (outputM m)
+    (lambda (ctx env)
+      (send-message (ctx-a ctx) 'output m)
+      (values '() env)))
+
   (define (run-system os root-env)
     (let* ([s (make-as (empty-queue) (make-eqv-hashtable) (box 0) root-env)]
            [root (make-a 'root 'root (lambda (ctx env) (void)) '() s root-env)]
@@ -157,7 +162,7 @@
 
       (root-actor 'output
         (lambda (ctx env)
-          (write (list (ctx-msg ctx)) output-port)))
+          (write (ctx-msg ctx) output-port)))
 
       (for-each (lambda (o)
                   (cond
