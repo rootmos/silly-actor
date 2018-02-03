@@ -89,8 +89,7 @@
   (define (>> ma f) (>>= ma (lambda (_) f)))
   (define (point x) (lambda (ctx env) (values x env)))
 
-  (define (match x p)
-    (printf "matching: ~s w/ ~s\n" x p)
+  (define (match x p env)
     (cond
       [(eqv? 'wildcard p) '()]
       [(and (pair? p) (eqv? (car p) 'number)
@@ -100,7 +99,10 @@
             (pair? x) (eqv? (car x) 'atom)
             (eqv? (cdr p) (cdr x))) '()]
       [(and (eqv? p '()) (eqv? x '())) '()]
-      [(and (pair? p) (eqv? (car p) 'var)) (list (cons (cdr p) x))]
+      [(and (pair? p) (eqv? (car p) 'bind)) (list (cons (cdr p) x))]
+      [(and (pair? p) (eqv? (car p) 'var))
+       (cond [(equal? x (lookup (cdr p) env)) '()]
+             [else #f])]
       [(and (pair? p) (eqv? (car p) 'list) (list? (cdr p))
             (pair? x) (eqv? (car x) 'list) (list? (cdr x))
             (eqv? (length (cdr p)) (length (cdr x))))
@@ -112,8 +114,8 @@
       (let go ([qs ps])
         (cond
           [(null? qs) (die ctx `(Match_error . ,x))]
-          [(match x (caar qs)) => (lambda (bs)
-                                    ((cdar qs) ctx (append bs env)))]
+          [(match x (caar qs) env) => (lambda (bs)
+                                        ((cdar qs) ctx (append bs env)))]
           [else (go (cdr qs))]))))
 
   (define (closeM m) (lambda (ctx env) (values (make-cl m env) env)))

@@ -37,6 +37,7 @@
   (Pattern (p)
     (atom a)
     (number n)
+    (bind a)
     (var a)
     wp
     '()
@@ -224,6 +225,7 @@
   (Pattern : Pattern (p) -> * ()
     [(atom ,a) `'(atom . ,a)]
     [(number ,n) `'(number . ,n)]
+    [(bind ,a) `'(bind . ,a)]
     [(var ,a) `'(var . ,a)]
     [,wp ''wildcard]
     ['() ''()]

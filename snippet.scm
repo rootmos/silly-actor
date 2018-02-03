@@ -72,7 +72,7 @@
          [(number 7) (output (state))]
          [_ (value '())])
        (define (main)
-         [_ (let ([(var id) (spawn (var aux) (value (atom success)))])
+         [_ (let ([(bind id) (spawn (var aux) (value (atom success)))])
               (send (var id) (value (number 7))))])))
   '((atom . success)))
 
@@ -86,4 +86,14 @@
        (define (main)
          [_ (send (spawn (var aux) (value (atom success)))
                                    (value (number 7)))])))
+  '((atom . success)))
+
+(test
+  (lambda (p)
+    `(system
+       [(init main '()) (output-port ,p)]
+       (define (main)
+         [_ (let ([(bind x) (value (number 7))])
+              (match (value (number 7))
+                [(var x) (output (value (atom success)))]))])))
   '((atom . success)))
