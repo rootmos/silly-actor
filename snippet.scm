@@ -5,7 +5,7 @@
                 (to-monad
                   (desugar
                     (parse-Lsrc x))))])
-    (pretty-print code)
+    ;(pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 
 (define (test code expected)
@@ -24,7 +24,7 @@
     `(system
        [(init main '()) (output-port ,p)]
        (define (main)
-         [_ (output (state))])))
+         [(sys Init) (output (state))])))
   '('()))
 
 (test

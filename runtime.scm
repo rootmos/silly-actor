@@ -57,7 +57,7 @@
   (define (spawn-actor a cl st)
     (let* ([s (a-system a)] [id (fresh-actor-id s)])
       (hashtable-set! (as-actors s) id (make-a id (a-id a) cl st s))
-      (send-message a id 'Init)
+      (send-message a id '(sys . Init))
       id))
 
   (define (remove-actor a) ; TODO make more efficient!
@@ -77,7 +77,7 @@
 
   (define (die ctx e)
     (let* ([a (ctx-a ctx)] [to (a-parent-id a)])
-      (send-message a to (cons 'Died e))
+      (send-message a to (cons '(sys . Died) e))
       (remove-actor a)
       ((ctx-k ctx))))
 
@@ -92,11 +92,8 @@
   (define (match x p env)
     (cond
       [(eqv? 'wildcard p) '()]
-      [(and (pair? p) (eqv? (car p) 'number)
-            (pair? x) (eqv? (car x) 'number)
-            (= (cdr p) (cdr x))) '()]
-      [(and (pair? p) (eqv? (car p) 'atom)
-            (pair? x) (eqv? (car x) 'atom)
+      [(and (pair? p) (pair? x)
+            (eqv? (car p) (car x))
             (eqv? (cdr p) (cdr x))) '()]
       [(and (eqv? p '()) (eqv? x '())) '()]
       [(and (pair? p) (eqv? (car p) 'bind)) (list (cons (cdr p) x))]
@@ -139,7 +136,7 @@
   (define stopM
     (lambda (ctx env)
       (let* ([a (ctx-a ctx)] [to (a-parent-id a)] [s (a-system a)])
-        (send-message a to 'Stopped)
+        (send-message a to '(sys . Stopped))
         (remove-actor a)
         ((ctx-k ctx)))))
 
@@ -165,9 +162,6 @@
       (sys-actor 'output
                  (lambda (ctx env)
                    (write (ctx-msg ctx) output-port)))
-
-      (let-values ([(k v) (hashtable-entries (as-actors s))])
-        (pretty-print k))
 
       (for-each (lambda (o)
                   (cond

@@ -25,10 +25,13 @@
     [equal? (substring (symbol->string x) 0 1) "_"]
     ))
 
+(define (sys? x) (symbol? x))
+
 (define-language
   Lsrc
   (terminals
     (atom (a))
+    (sys (s))
     (number (n))
     (wildcard-pattern (wp))
     (fun (f))
@@ -36,6 +39,7 @@
   (entry System)
   (Pattern (p)
     (atom a)
+    (sys s)
     (number n)
     (bind a)
     (var a)
@@ -70,13 +74,10 @@
   (list? (member x '(stop spawn send become from msg parent state
                           self this-closure))))
 
-(define (sys? x) (symbol? x))
-
 (define-language
   Ldesugared
   (extends Lsrc)
   (terminals
-    (+ (sys (s)))
     (- (fun (f)))
     (+ (primfun (pf))))
   (Value (v)
@@ -227,6 +228,7 @@
     [(number ,n) `'(number . ,n)]
     [(bind ,a) `'(bind . ,a)]
     [(var ,a) `'(var . ,a)]
+    [(sys ,s) `'(sys . ,s)]
     [,wp ''wildcard]
     ['() ''()]
     [(list ,p* ...) (cons 'list (map Pattern p*))])
