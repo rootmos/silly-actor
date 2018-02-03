@@ -1,7 +1,9 @@
 (load "silly-actor.scm")
 
 (define (interp x)
-  (let ([code (output-scheme (parse-Lsrc x))])
+  (let ([code (output-scheme
+                (to-monad
+                  (parse-Lsrc x)))])
     (pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 

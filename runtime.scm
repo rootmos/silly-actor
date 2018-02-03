@@ -1,8 +1,7 @@
 (library (runtime)
-  (export pattern-matchM
-          >>= >> point
+  (export >>= >> point
           stateM msgM fromM selfM
-          lookupM
+          lookupM matchM
           becomeM spawnM sendM stopM stayM outputM
           run-system)
   (import (chezscheme))
@@ -105,15 +104,14 @@
        (ni 'match)]
       [else #f]))
 
-  (define (pattern-matchM ps)
-    (lambda (x)
-      (lambda (ctx env)
-        (let go ([qs ps])
-          (cond
-            [(null? qs) (die ctx `(Match_error . ,x))]
-            [(match x (caar qs)) => (lambda (bs)
-                                      ((cdar qs) ctx (append bs env)))]
-            [else (go (cdr qs))])))))
+  (define (matchM x ps)
+    (lambda (ctx env)
+      (let go ([qs ps])
+        (cond
+          [(null? qs) (die ctx `(Match_error . ,x))]
+          [(match x (caar qs)) => (lambda (bs)
+                                    ((cdar qs) ctx (append bs env)))]
+          [else (go (cdr qs))]))))
 
   (define (becomeM f st)
     (lambda (ctx env)
