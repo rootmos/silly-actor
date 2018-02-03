@@ -57,7 +57,8 @@
   (define (spawn-actor a cl st)
     (let* ([s (a-system a)] [id (fresh-actor-id s)])
       (hashtable-set! (as-actors s) id (make-a id (a-id a) cl st s))
-      (send-message a id 'Init)))
+      (send-message a id 'Init)
+      id))
 
   (define (remove-actor a) ; TODO make more efficient!
     (let ([id (a-id a)] [as (as-actors (a-system a))])
@@ -126,7 +127,7 @@
 
   (define (spawnM cl st)
     (lambda (ctx env)
-      (spawn-actor (ctx-a ctx) cl st)))
+      (values (spawn-actor (ctx-a ctx) cl st) env)))
 
   (define (stayM st)
     (lambda (ctx env)
@@ -151,8 +152,13 @@
       (send-message (ctx-a ctx) 'output m)
       (values '() env)))
 
-  (define (run-system os root-env)
-    (let* ([s (make-as (empty-queue) (make-eqv-hashtable) (box 0) root-env)]
+  (define (run-system os root-defs)
+    (let* ([root-env (fold-left (lambda (env d)
+                                  (cons (cons (car d) (make-cl (cdr d) env))
+                                        env))
+                                '()
+                                root-defs)]
+           [s (make-as (empty-queue) (make-eqv-hashtable) (box 0) root-env)]
            [root (make-a 'root
                          'root
                          (make-cl (lambda (ctx env) (void)) root-env)
@@ -166,8 +172,8 @@
       (hashtable-set! (as-actors s) 'root root)
 
       (root-actor 'output
-        (lambda (ctx env)
-          (write (ctx-msg ctx) output-port)))
+                  (lambda (ctx env)
+                    (write (ctx-msg ctx) output-port)))
 
       (for-each (lambda (o)
                   (cond
@@ -175,7 +181,7 @@
                      (let ([a (cadr o)] [v (caddr o)])
                        (spawn-actor
                          (hashtable-ref (as-actors s) 'root #f)
-                         (make-cl (lookup a root-env) root-env)
+                         (lookup a root-env)
                          v))]
                     [(and (eqv? (car o) 'output-port))
                      (set! output-port (cadr o))]

@@ -167,6 +167,9 @@
          [(equal? (length es) 1) (Expr (car es))]
          [else `(>> ,(Expr (car es)) ,(go (cdr es)))]))]
     [(actor ,ma* ...) `(close ,(mk-actor ma*))]
+    [(match ,e ,ma* ...)
+     (let ([a (fresh-anf-var)])
+       `(>>= ,(Expr e) (,a) (match ,(mk-anf-val a) ,(map MatchArm ma*) ...)))]
     ))
 
 (define-pass output-scheme : L1-monad (l) -> * ()

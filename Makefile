@@ -1,4 +1,4 @@
-SCHEME=scheme --compile-imported-libraries --libdirs nanopass-framework-scheme:thunderchez
+SCHEME=scheme --compile-imported-libraries --libdirs .:nanopass-framework-scheme:thunderchez
 
 snippet:
 	timeout 2s $(SCHEME) --script snippet.scm

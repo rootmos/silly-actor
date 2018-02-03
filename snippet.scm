@@ -59,7 +59,18 @@
        (define (main)
          [_ (seq
               (send (self) (value (number 8)))
-              (become (actor
-                        [(number 8) (output (value (atom success)))])
+              (become (actor [(number 8) (output (value (atom success)))])
                       (state)))])))
+  '((atom . success)))
+
+(test
+  (lambda (p)
+    `(system
+       [(init main '()) (output-port ,p)]
+       (define (main)
+         [_ (match (spawn (var aux) (value (atom success)))
+                   [(var id) (send (var id) (value (number 7)))])])
+       (define (aux)
+         [(number 7) (output (state))]
+         [_ (value '())])))
   '((atom . success)))
