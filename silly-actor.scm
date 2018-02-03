@@ -192,7 +192,7 @@
     [(>>= ,e0 (,av) ,e1) `(>>= ,(Expr e0) (lambda (,av) ,(Expr e1)))]
     [(>> ,e0 ,e1) `(>> ,(Expr e0) ,(Expr e1))]
     [(var ,a) `(lookupM ',a)]
-    [(close ,e) `(closeM . ,(Expr e))])
+    [(close ,e) `(closeM ,(Expr e))])
   (MatchArm : MatchArm (ma) -> * ()
     [(,p ,e) `(cons ,(Pattern p) ,(Expr e))])
   (ActorDef : ActorDef (ad) -> * ()

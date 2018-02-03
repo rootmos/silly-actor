@@ -35,3 +35,31 @@
               (output (value (number 1)))
               (output (value (number 2))))])))
   '((number . 1) (number . 2)))
+
+(test
+  (lambda (p)
+    `(system
+       [(init main (number 7)) (output-port ,p)]
+       (define (main) [_ (output (state))])))
+  '('(number . 7)))
+
+(test
+  (lambda (p)
+    `(system
+       [(init main '()) (output-port ,p)]
+       (define (main)
+         [(number 8) (output (value (atom success)))]
+         [_ (send (self) (value (number 8)))])))
+  '((atom . success)))
+
+(test
+  (lambda (p)
+    `(system
+       [(init main '()) (output-port ,p)]
+       (define (main)
+         [_ (seq
+              (send (self) (value (number 8)))
+              (become (actor
+                        [(number 8) (output (value (atom success)))])
+                      (state)))])))
+  '((atom . success)))

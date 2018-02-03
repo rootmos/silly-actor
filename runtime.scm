@@ -1,14 +1,15 @@
 (library (runtime)
   (export >>= >> point
           stateM msgM fromM selfM
-          lookupM matchM
+          lookupM matchM closeM
           becomeM spawnM sendM stopM stayM outputM
           run-system)
   (import (chezscheme))
 
   (define-record-type as (fields inbox actors actor-counter root-env))
+  (define-record-type cl (fields f env))
   (define-record-type a
-    (fields id parent-id (mutable f) (mutable state) system (mutable env)))
+    (fields id parent-id (mutable cl) (mutable state) system))
 
   (define (ni what) (error what "not implemented"))
 
@@ -47,17 +48,15 @@
       (cond
         [(hashtable-ref (as-actors s) to #f) => (lambda (a)
            (printf "delivering message:~s to:~s from:~s\n" msg to from)
-           (call/cc (lambda (k) ((a-f a) (make-ctx a k from msg) (a-env a)))))]
+           (call/cc (lambda (k)
+                      ((cl-f (a-cl a)) (make-ctx a k from msg)
+                                       (cl-env (a-cl a))))))]
         [else (printf "undeliverable message:~s to:~s from:~s\n" msg to from)]
         )))
 
-  (define (spawn-actor a f st env)
-    (let* ([s (a-system a)]
-           [id (fresh-actor-id s)])
-      (hashtable-set!
-        (as-actors s)
-        id
-        (make-a id (a-id a) f st s env))
+  (define (spawn-actor a cl st)
+    (let* ([s (a-system a)] [id (fresh-actor-id s)])
+      (hashtable-set! (as-actors s) id (make-a id (a-id a) cl st s))
       (send-message a id 'Init)))
 
   (define (remove-actor a) ; TODO make more efficient!
@@ -90,9 +89,12 @@
   (define (point x) (lambda (ctx env) (values x env)))
 
   (define (match x p)
+    (printf "matching: ~s w/ ~s\n" x p)
     (cond
       [(eqv? 'wildcard p) '()]
-      [(and (number? p) (number? x) (eqv? x p)) '()]
+      [(and (pair? p) (eqv? (car p) 'number)
+            (pair? x) (eqv? (car x) 'number)
+            (= (cdr p) (cdr x))) '()]
       [(and (pair? p) (eqv? (car p) 'atom)
             (pair? x) (eqv? (car x) 'atom)
             (eqv? (cdr p) (cdr x))) '()]
@@ -113,17 +115,18 @@
                                     ((cdar qs) ctx (append bs env)))]
           [else (go (cdr qs))]))))
 
-  (define (becomeM f st)
+  (define (closeM m) (lambda (ctx env) (values (make-cl m env) env)))
+
+  (define (becomeM cl st)
     (lambda (ctx env)
       (let ([a (ctx-a ctx)])
-        (a-f-set! a f)
+        (a-cl-set! a cl)
         (a-state-set! a st)
-        (a-env-set! a env)
         ((ctx-k ctx)))))
 
-  (define (spawnM ca st)
+  (define (spawnM cl st)
     (lambda (ctx env)
-      (spawn-actor (ctx-a ctx) ca st env)))
+      (spawn-actor (ctx-a ctx) cl st)))
 
   (define (stayM st)
     (lambda (ctx env)
@@ -150,11 +153,15 @@
 
   (define (run-system os root-env)
     (let* ([s (make-as (empty-queue) (make-eqv-hashtable) (box 0) root-env)]
-           [root (make-a 'root 'root (lambda (ctx env) (void)) '() s root-env)]
+           [root (make-a 'root
+                         'root
+                         (make-cl (lambda (ctx env) (void)) root-env)
+                         '()
+                         s)]
            [root-actor (lambda (id f)
                          (hashtable-set!
                            (as-actors s) id
-                           (make-a id 'root f '() s root-env)))]
+                           (make-a id 'root (make-cl f root-env) '() s)))]
            [output-port (current-output-port)])
       (hashtable-set! (as-actors s) 'root root)
 
@@ -168,9 +175,8 @@
                      (let ([a (cadr o)] [v (caddr o)])
                        (spawn-actor
                          (hashtable-ref (as-actors s) 'root #f)
-                         (lookup a root-env)
-                         v
-                         root-env))]
+                         (make-cl (lookup a root-env) root-env)
+                         v))]
                     [(and (eqv? (car o) 'output-port))
                      (set! output-port (cadr o))]
                     [else (void)])) os)
