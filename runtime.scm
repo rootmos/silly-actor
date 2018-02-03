@@ -2,7 +2,7 @@
   (export >>= >> point
           stateM msgM fromM selfM
           lookupM matchM closeM
-          becomeM spawnM sendM stopM stayM outputM
+          becomeM spawnM sendM stopM
           run-system)
   (import (chezscheme))
 
@@ -129,12 +129,6 @@
     (lambda (ctx env)
       (values (spawn-actor (ctx-a ctx) cl st) env)))
 
-  (define (stayM st)
-    (lambda (ctx env)
-      (let ([a (ctx-a ctx)])
-        (a-state-set! a st)
-        ((ctx-k ctx)))))
-
   (define (sendM id m)
     (lambda (ctx env)
       (send-message (ctx-a ctx) id m)
@@ -146,11 +140,6 @@
         (send-message a to 'Stopped)
         (remove-actor a)
         ((ctx-k ctx)))))
-
-  (define (outputM m)
-    (lambda (ctx env)
-      (send-message (ctx-a ctx) 'output m)
-      (values '() env)))
 
   (define (run-system os root-defs)
     (let* ([root-env (fold-left (lambda (env d)
@@ -164,16 +153,19 @@
                          (make-cl (lambda (ctx env) (void)) root-env)
                          '()
                          s)]
-           [root-actor (lambda (id f)
-                         (hashtable-set!
-                           (as-actors s) id
-                           (make-a id 'root (make-cl f root-env) '() s)))]
+           [sys-actor (lambda (id f)
+                        (hashtable-set!
+                          (as-actors s) id
+                          (make-a id 'root (make-cl f root-env) '() s)))]
            [output-port (current-output-port)])
       (hashtable-set! (as-actors s) 'root root)
 
-      (root-actor 'output
-                  (lambda (ctx env)
-                    (write (ctx-msg ctx) output-port)))
+      (sys-actor 'output
+                 (lambda (ctx env)
+                   (write (ctx-msg ctx) output-port)))
+
+      (let-values ([(k v) (hashtable-entries (as-actors s))])
+        (pretty-print k))
 
       (for-each (lambda (o)
                   (cond

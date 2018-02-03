@@ -3,7 +3,8 @@
 (define (interp x)
   (let ([code (output-scheme
                 (to-monad
-                  (parse-Lsrc x)))])
+                  (desugar
+                    (parse-Lsrc x))))])
     (pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 

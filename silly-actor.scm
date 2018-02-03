@@ -1,26 +1,13 @@
 (import (matchable) (nanopass))
 
-(define primfuns
-  '((stop 0 stopM)
-    (spawn 2 spawnM)
-    (send 2 sendM)
-    (become 2 becomeM)
-    (stay 1 stayM)
-    (from 0 fromM)
-    (msg 0 msgM)
-    (parent 0 parentM)
-    (state 0 stateM)
-    (self 0 selfM)
-    (output 1 outputM)
-    ))
-
-(define (primfun? x) (list? (member x (map car primfuns))))
-(define (monadfun? x) (list? (member x (map caddr primfuns))))
+(define (fun? x)
+  (list? (member x '(stop spawn send become stay
+                          from msg parent state self output))))
 
 (define (atom? x)
   (and
     [symbol? x]
-    [not (primfun? x)]
+    [not (fun? x)]
     [char-lower-case? (car (string->list (symbol->string x)))]
     [not (equal? (substring (symbol->string x) 0 1) "_")]
     ))
@@ -44,7 +31,7 @@
     (atom (a))
     (number (n))
     (wildcard-pattern (wp))
-    (primfun (pf))
+    (fun (f))
     (output-port (op)))
   (entry System)
   (Pattern (p)
@@ -62,8 +49,8 @@
   (Expr (e)
     (value v)
     (var a)
-    (pf)
-    (pf e* ...)
+    (f)
+    (f e* ...)
     (seq e* ...)
     (list e* ...)
     (actor ma* ...)
@@ -77,9 +64,56 @@
 
 (define-parser parse-Lsrc Lsrc)
 
+(define (primfun? x)
+  (list? (member x '(stop spawn send become from msg parent state
+                          self this-closure))))
+
+(define (sys? x) (symbol? x))
+
 (define-language
-  L1-monad
+  Ldesugared
   (extends Lsrc)
+  (terminals
+    (+ (sys (s)))
+    (- (fun (f)))
+    (+ (primfun (pf))))
+  (Value (v)
+    (+ (sys s)))
+  (Expr (e)
+    (- (f))
+    (+ (pf))
+    (- (f e* ...))
+    (+ (pf e* ...))))
+
+(define-pass desugar : Lsrc (l) -> Ldesugared ()
+  (Expr : Expr (e) -> Expr ()
+    [(,f) `(,f)]
+    [(,f ,e* ...)
+     (case f
+       ['stay `(become (this-closure) ,(map Expr e*) ...)]
+       ['output `(send (value (sys output)) ,(map Expr e*) ...)]
+       [else `(,f ,(map Expr e*) ...)])]))
+
+(define primfun-to-monadfun
+  '((stop 0 stopM)
+    (spawn 2 spawnM)
+    (send 2 sendM)
+    (become 2 becomeM)
+    (from 0 fromM)
+    (msg 0 msgM)
+    (parent 0 parentM)
+    (state 0 stateM)
+    (self 0 selfM)
+    (this-closure 0 this-closureM)
+    ))
+
+(define (monadfun? x)
+  (list? (member x '(stopM spawnM sendM becomeM
+                           fromM msgM parentM stateM selfM this-closureM))))
+
+(define-language
+  Lmonad
+  (extends Ldesugared)
   (terminals
     (- (primfun (pf)))
     (+ (monadfun (mf)))
@@ -105,16 +139,16 @@
     (- (match e ma* ...))
     (+ (match v ma* ...))))
 
-(define-pass to-monad : Lsrc (l) -> L1-monad ()
+(define-pass to-monad : Ldesugared (l) -> Lmonad ()
   (definitions
     (define anf-counter 0)
     (define (fresh-anf-var)
       (let* ([c anf-counter]
              [a (string->symbol (format "_anf-~s" c))])
         (set! anf-counter (+ c 1)) a))
-    (with-output-language (L1-monad Value)
+    (with-output-language (Lmonad Value)
       (define (mk-anf-val av) `(anf-val ,av)))
-    (with-output-language (L1-monad Expr)
+    (with-output-language (Lmonad Expr)
       (define (mk-actor ma*)
         (let ([av (fresh-anf-var)])
           `(>>= msgM (,av)
@@ -131,7 +165,7 @@
     [(value ,v) `(point ,(Value v))]
     [(,pf)
      (cond
-       [(assv pf primfuns)
+       [(assv pf primfun-to-monadfun)
         => (lambda (l)
              (cond
                [(= 0 (cadr l)) (caddr l)]
@@ -144,7 +178,7 @@
                     pf)])]
     [(,pf ,e* ...)
      (cond
-       [(assv pf primfuns)
+       [(assv pf primfun-to-monadfun)
         => (lambda (l)
              (cond
                [(= (length e*) (cadr l))
@@ -172,7 +206,7 @@
        `(>>= ,(Expr e) (,a) (match ,(mk-anf-val a) ,(map MatchArm ma*) ...)))]
     ))
 
-(define-pass output-scheme : L1-monad (l) -> * ()
+(define-pass output-scheme : Lmonad (l) -> * ()
   (Pattern : Pattern (p) -> * ()
     [(atom ,a) `'(atom . ,a)]
     [(number ,n) `'(number . ,n)]
@@ -182,6 +216,7 @@
     [(list ,p* ...) (cons 'list (map Pattern p*))])
   (Value : Value (v) -> * ()
     [(atom ,a) `'(atom . ,a)]
+    [(sys ,s) `',s]
     [(anf-val ,av) av]
     [(number ,n) `'(number . ,n)]
     ['() ''()]
