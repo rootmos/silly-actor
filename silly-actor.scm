@@ -2,7 +2,7 @@
 
 (define (fun? x)
   (list? (member x '(stop spawn send become stay
-                          from msg parent state self output))))
+                          from msg parent state self output reply))))
 
 (define (atom? x)
   (and
@@ -54,7 +54,8 @@
     (seq e* ...)
     (list e* ...)
     (actor ma* ...)
-    (match e ma* ...))
+    (match e ma* ...)
+    (let (ma* ...) e))
   (MatchArm (ma) (p e))
   (ActorDef (ad) (define (a) ma* ...))
   (Options (o)
@@ -83,16 +84,29 @@
     (- (f))
     (+ (pf))
     (- (f e* ...))
-    (+ (pf e* ...))))
+    (+ (pf e* ...))
+    (- (let (ma* ...) e))))
 
 (define-pass desugar : Lsrc (l) -> Ldesugared ()
+  (Pattern : Pattern (p) -> Pattern ())
+  (split-arm : MatchArm (ma) -> * ()
+    [(,p ,e) (cons p e)])
   (Expr : Expr (e) -> Expr ()
     [(,f) `(,f)]
     [(,f ,e* ...)
      (case f
        ['stay `(become (this-closure) ,(map Expr e*) ...)]
        ['output `(send (value (sys output)) ,(map Expr e*) ...)]
-       [else `(,f ,(map Expr e*) ...)])]))
+       ['reply `(send (from) ,(map Expr e*) ...)]
+       [else `(,f ,(map Expr e*) ...)])]
+    [(let (,ma* ...) ,e)
+     (let go ([mas ma*])
+       (cond
+         [(null? mas) (Expr e)]
+         [else
+           (let ([arm (split-arm (car mas))])
+           `(match ,(Expr (cdr arm)) (,(Pattern (car arm)) ,(go (cdr mas)))))]))]
+    ))
 
 (define primfun-to-monadfun
   '((stop 0 stopM)

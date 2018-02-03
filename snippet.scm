@@ -72,8 +72,8 @@
          [(number 7) (output (state))]
          [_ (value '())])
        (define (main)
-         [_ (match (spawn (var aux) (value (atom success)))
-                   [(var id) (send (var id) (value (number 7)))])])))
+         [_ (let ([(var id) (spawn (var aux) (value (atom success)))])
+              (send (var id) (value (number 7))))])))
   '((atom . success)))
 
 (test
