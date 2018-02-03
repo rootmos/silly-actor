@@ -147,19 +147,19 @@
                                 '()
                                 root-defs)]
            [s (make-as (empty-queue) (make-eqv-hashtable) (box 0) root-env)]
-           [root (make-a 'root
-                         'root
+           [root (make-a 'Root
+                         'Root
                          (make-cl (lambda (ctx env) (void)) root-env)
                          '()
                          s)]
            [sys-actor (lambda (id f)
                         (hashtable-set!
                           (as-actors s) id
-                          (make-a id 'root (make-cl f root-env) '() s)))]
+                          (make-a id 'Root (make-cl f root-env) '() s)))]
            [output-port (current-output-port)])
-      (hashtable-set! (as-actors s) 'root root)
+      (hashtable-set! (as-actors s) 'Root root)
 
-      (sys-actor 'output
+      (sys-actor 'Output
                  (lambda (ctx env)
                    (write (ctx-msg ctx) output-port)))
 
@@ -168,7 +168,7 @@
                     [(and (eqv? (car o) 'init))
                      (let ([a (cadr o)] [v (caddr o)])
                        (spawn-actor
-                         (hashtable-ref (as-actors s) 'root #f)
+                         (hashtable-ref (as-actors s) 'Root #f)
                          (lookup a root-env)
                          v))]
                     [(and (eqv? (car o) 'output-port))

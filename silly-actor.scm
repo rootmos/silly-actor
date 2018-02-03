@@ -11,12 +11,24 @@
     [char-lower-case? (car (string->list (symbol->string x)))]
     [not (equal? (substring (symbol->string x) 0 1) "_")]
     ))
+
+(define (sys? x)
+  (list? (member x '(Init Match_error Stopped Output))))
+
+(define (bound-var? x)
+  (and
+    [symbol? x]
+    [not (sys? x)]
+    [char-upper-case? (car (string->list (symbol->string x)))]
+    ))
+
 (define (anf-val? x)
   (and
     [symbol? x]
     [>= (string-length (symbol->string x)) 5]
     [equal? (substring (symbol->string x) 0 5) "_anf-"]
     ))
+
 (define (variable-pattern? x)
   (match x [('unquote s) (atom? s)] [else #f]))
 (define (wildcard-pattern? x)
@@ -24,8 +36,6 @@
     [symbol? x]
     [equal? (substring (symbol->string x) 0 1) "_"]
     ))
-
-(define (sys? x) (symbol? x))
 
 (define-language
   Lsrc
@@ -35,25 +45,26 @@
     (number (n))
     (wildcard-pattern (wp))
     (fun (f))
+    (bound-var (bv))
     (output-port (op)))
   (entry System)
   (Pattern (p)
-    (atom a)
-    (sys s)
-    (number n)
-    (bind a)
-    (var a)
+    a
+    s
+    n
+    bv
+    (quote bv)
     wp
     '()
     (list p* ...))
   (Value (v)
-    (atom a)
-    (number n)
+    a
+    n
     '()
     (list v* ...))
   (Expr (e)
-    (value v)
-    (var a)
+    v
+    bv
     (f)
     (f e* ...)
     (seq e* ...)
@@ -62,11 +73,51 @@
     (match e ma* ...)
     (let (ma* ...) e))
   (MatchArm (ma) (p e))
-  (ActorDef (ad) (define (a) ma* ...))
+  (ActorDef (ad) (define (bv) ma* ...))
   (Options (o)
-    (init a v)
+    (init bv v)
     (output-port op))
   (System (t) (system (o* ...) ad* ...)))
+
+(define-language
+  Ltagged
+  (extends Lsrc)
+  (Pattern (p)
+    (- a)
+    (+ (atom a))
+    (- n)
+    (+ (number n))
+    (- s)
+    (+ (sys s))
+    (- bv)
+    (+ (bind bv))
+    (- (quote bv))
+    (+ (var bv)))
+  (Value (v)
+    (- a)
+    (+ (atom a))
+    (- n)
+    (+ (number n)))
+  (Expr (e)
+    (- v)
+    (+ (value v))
+    (- bv)
+    (+ (var bv))))
+
+(define-pass tag-values : Lsrc (l) -> Ltagged ()
+  (Pattern : Pattern (v) -> Pattern ()
+    [,n `(number ,n)]
+    [,a `(atom ,a)]
+    [,s `(sys ,s)]
+    [,bv `(bind ,bv)]
+    [(quote ,bv) `(var ,bv)])
+  (Value : Value (v) -> Value ()
+    [,n `(number ,n)]
+    [,a `(atom ,a)])
+  (Expr : Expr (e) -> Expr ()
+    [,v `(value ,(Value v))]
+    [,bv `(var ,bv)])
+  )
 
 (define-parser parse-Lsrc Lsrc)
 
@@ -76,7 +127,7 @@
 
 (define-language
   Ldesugared
-  (extends Lsrc)
+  (extends Ltagged)
   (terminals
     (- (fun (f)))
     (+ (primfun (pf))))
@@ -89,7 +140,7 @@
     (+ (pf e* ...))
     (- (let (ma* ...) e))))
 
-(define-pass desugar : Lsrc (l) -> Ldesugared ()
+(define-pass desugar : Ltagged (l) -> Ldesugared ()
   (Pattern : Pattern (p) -> Pattern ())
   (split-arm : MatchArm (ma) -> * ()
     [(,p ,e) (cons p e)])
@@ -98,7 +149,7 @@
     [(,f ,e* ...)
      (case f
        ['stay `(become (this-closure) ,(map Expr e*) ...)]
-       ['output `(send (value (sys output)) ,(map Expr e*) ...)]
+       ['output `(send (value (sys Output)) ,(map Expr e*) ...)]
        ['reply `(send (from) ,(map Expr e*) ...)]
        [else `(,f ,(map Expr e*) ...)])]
     [(let (,ma* ...) ,e)
@@ -137,8 +188,8 @@
   (Value (v)
     (+ (anf-val av)))
   (ActorDef (ad)
-    (- (define (a) ma* ...))
-    (+ (define (a) e)))
+    (- (define (bv) ma* ...))
+    (+ (define (bv) e)))
   (Expr (e)
     (- (actor ma* ...))
     (+ (close e))
@@ -176,7 +227,7 @@
   (MatchArm : MatchArm (ma) -> MatchArm ())
   (Value : Value (v) -> Value ())
   (ActorDef : ActorDef (ad) -> ActorDef ()
-    [(define (,a) ,ma* ...) `(define (,a) ,(mk-actor ma*))])
+    [(define (,bv) ,ma* ...) `(define (,bv) ,(mk-actor ma*))])
   (Expr : Expr (e) -> Expr ()
     [(value ,v) `(point ,(Value v))]
     [(,pf)
@@ -226,8 +277,8 @@
   (Pattern : Pattern (p) -> * ()
     [(atom ,a) `'(atom . ,a)]
     [(number ,n) `'(number . ,n)]
-    [(bind ,a) `'(bind . ,a)]
-    [(var ,a) `'(var . ,a)]
+    [(bind ,bv) `'(bind . ,bv)]
+    [(var ,bv) `'(var . ,bv)]
     [(sys ,s) `'(sys . ,s)]
     [,wp ''wildcard]
     ['() ''()]
@@ -247,14 +298,14 @@
     [,mf mf]
     [(>>= ,e0 (,av) ,e1) `(>>= ,(Expr e0) (lambda (,av) ,(Expr e1)))]
     [(>> ,e0 ,e1) `(>> ,(Expr e0) ,(Expr e1))]
-    [(var ,a) `(lookupM ',a)]
+    [(var ,bv) `(lookupM ',bv)]
     [(close ,e) `(closeM ,(Expr e))])
   (MatchArm : MatchArm (ma) -> * ()
     [(,p ,e) `(cons ,(Pattern p) ,(Expr e))])
   (ActorDef : ActorDef (ad) -> * ()
-    [(define (,a) ,e) `(cons ',a ,(Expr e))])
+    [(define (,bv) ,e) `(cons ',bv ,(Expr e))])
   (Options : Options (o) -> * ()
-    [(init ,a ,v) `(init ,a ,(Value v))]
+    [(init ,bv ,v) `(init ,bv ,(Value v))]
     [(output-port ,op) `(output-port ,op)])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)

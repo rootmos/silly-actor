@@ -4,7 +4,8 @@
   (let ([code (output-scheme
                 (to-monad
                   (desugar
-                    (parse-Lsrc x))))])
+                    (tag-values
+                      (parse-Lsrc x)))))])
     ;(pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 
@@ -22,78 +23,60 @@
 (test
   (lambda (p)
     `(system
-       [(init main '()) (output-port ,p)]
-       (define (main)
-         [(sys Init) (output (state))])))
+       [(init Main '()) (output-port ,p)]
+       (define (Main) [Init (output (state))])))
   '('()))
 
 (test
   (lambda (p)
     `(system
-       [(init main '()) (output-port ,p)]
-       (define (main)
-         [_ (seq
-              (output (value (number 1)))
-              (output (value (number 2))))])))
+       [(init Main '()) (output-port ,p)]
+       (define (Main) [_ (seq (output 1) (output 2))])))
   '((number . 1) (number . 2)))
 
 (test
   (lambda (p)
     `(system
-       [(init main (number 7)) (output-port ,p)]
-       (define (main) [_ (output (state))])))
+       [(init Main 7) (output-port ,p)]
+       (define (Main) [_ (output (state))])))
   '('(number . 7)))
 
 (test
   (lambda (p)
     `(system
-       [(init main '()) (output-port ,p)]
-       (define (main)
-         [(number 8) (output (value (atom success)))]
-         [_ (send (self) (value (number 8)))])))
+       [(init Main '()) (output-port ,p)]
+       (define (Main) [8 (output success)] [_ (send (self) 8)])))
   '((atom . success)))
 
 (test
   (lambda (p)
     `(system
-       [(init main '()) (output-port ,p)]
-       (define (main)
+       [(init Main '()) (output-port ,p)]
+       (define (Main)
          [_ (seq
-              (send (self) (value (number 8)))
-              (become (actor [(number 8) (output (value (atom success)))])
-                      (state)))])))
+              (send (self) 8)
+              (become (actor [8 (output success)]) (state)))])))
   '((atom . success)))
 
 (test
   (lambda (p)
     `(system
-       [(init main '()) (output-port ,p)]
-       (define (aux)
-         [(number 7) (output (state))]
-         [_ (value '())])
-       (define (main)
-         [_ (let ([(bind id) (spawn (var aux) (value (atom success)))])
-              (send (var id) (value (number 7))))])))
+       [(init Main '()) (output-port ,p)]
+       (define (Aux) [7 (output (state))] [_ '()])
+       (define (Main) [_ (let ([Id (spawn Aux success)]) (send Id 7))])))
   '((atom . success)))
 
 (test
   (lambda (p)
     `(system
-       [(init main '()) (output-port ,p)]
-       (define (aux)
-         [(number 7) (output (state))]
-         [_ (value '())])
-       (define (main)
-         [_ (send (spawn (var aux) (value (atom success)))
-                                   (value (number 7)))])))
+       [(init Main '()) (output-port ,p)]
+       (define (Aux) [7 (output (state))] [_ '()])
+       (define (Main) [_ (send (spawn Aux success) 7)])))
   '((atom . success)))
 
 (test
   (lambda (p)
     `(system
-       [(init main '()) (output-port ,p)]
-       (define (main)
-         [_ (let ([(bind x) (value (number 7))])
-              (match (value (number 7))
-                [(var x) (output (value (atom success)))]))])))
+       [(init Main '()) (output-port ,p)]
+       (define (Main) [_ (let ([X 7]) (match 7 ['X (output success)]))])))
   '((atom . success)))
