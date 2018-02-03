@@ -67,10 +67,22 @@
   (lambda (p)
     `(system
        [(init main '()) (output-port ,p)]
-       (define (main)
-         [_ (match (spawn (var aux) (value (atom success)))
-                   [(var id) (send (var id) (value (number 7)))])])
        (define (aux)
          [(number 7) (output (state))]
-         [_ (value '())])))
+         [_ (value '())])
+       (define (main)
+         [_ (match (spawn (var aux) (value (atom success)))
+                   [(var id) (send (var id) (value (number 7)))])])))
+  '((atom . success)))
+
+(test
+  (lambda (p)
+    `(system
+       [(init main '()) (output-port ,p)]
+       (define (aux)
+         [(number 7) (output (state))]
+         [_ (value '())])
+       (define (main)
+         [_ (send (spawn (var aux) (value (atom success)))
+                                   (value (number 7)))])))
   '((atom . success)))

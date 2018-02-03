@@ -207,4 +207,4 @@
     [(system (,o* ...) ,ad* ...)
      `(run-system
         ',(map Options o*)
-        ,(cons 'list  (map ActorDef (reverse ad*))))]))
+        ,(cons 'list  (map ActorDef ad*)))]))
