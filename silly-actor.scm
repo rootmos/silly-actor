@@ -57,19 +57,20 @@
     (quote bv)
     wp
     null
-    (list p* ...))
+    (p* ...))
   (Value (v)
     a
     n
     null
+    '(v* ...)
     (list v* ...))
   (Expr (e)
     v
     bv
     (f)
     (f e* ...)
-    (seq e* ...)
     (list e* ...)
+    (seq e* ...)
     (actor ma* ...)
     (match e ma* ...)
     (let (ma* ...) e))
@@ -86,29 +87,33 @@
   Lcons+nil
   (extends Lsrc)
   (Pattern (p)
-    (- (list p* ...))
+    (- (p* ...))
     (+ (cons p0 p1)))
   (Value (v)
     (- (list v* ...))
+    (- '(v* ...))
     (+ (cons v0 v1)))
   (Expr (e)
     (- (list e* ...))
     (+ (cons e0 e1))))
 
 (define-pass list-to-cons+nil : Lsrc (l) -> Lcons+nil ()
+  (definitions
+    (with-output-language (Lcons+nil Value)
+      (define (mk-v vs)
+        (cond
+          [(null? vs) '()]
+          [else `(cons ,(Value (car vs)) ,(mk-v (cdr vs)))]))))
   (Pattern : Pattern (p) -> Pattern ()
-    [(list ,p* ...)
+    [(,p* ...)
      (let go ([ps p*])
        (cond
          [(null? ps) '()]
          [else `(cons ,(Pattern (car ps)) ,(go (cdr ps)))]))])
   (Value : Value (v) -> Value ()
-    [(list ,v* ...)
-     (let go ([vs v*])
-       (cond
-         [(null? vs) '()]
-         [else `(cons ,(Value (car vs)) ,(go (cdr vs)))]))])
-)
+    [(list ,v* ...) (mk-v v*)]
+    ['(,v* ...) (mk-v v*)])
+  )
 
 (define-language
   Ltagged

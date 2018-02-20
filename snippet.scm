@@ -86,5 +86,5 @@
   (lambda (p)
     `(system
        [(init Main ()) (output-port ,p)]
-       (define (Main) [_ (match (list 1 2) [(list X _) (output X)])])))
+       (define (Main) [_ (match '(1 2) [(X _) (output X)])])))
   '((number . 1)))
