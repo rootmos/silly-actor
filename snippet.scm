@@ -3,10 +3,11 @@
 (define (interp x)
   (let ([code (output-scheme
                 (to-monad
-                  (desugar
-                    (tag-values
-                      (list-to-cons+nil
-                        (parse-Lsrc x))))))])
+                  (continuation-constructs
+                    (desugar
+                      (tag-values
+                        (list-to-cons+nil
+                          (parse-Lsrc x)))))))])
     ;(pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 
@@ -106,6 +107,6 @@
        (define (Main)
          [_ (let ([Id (spawn Aux ())])
               (seq
-                (send Id 7) (output (recv [8 a]))
-                (send Id 9) (output (recv [10 b]))))])))
+                (output (call Id 7 [8 a]))
+                (output (call Id 9 [10 b]))))])))
   '((atom . a) (atom . b)))

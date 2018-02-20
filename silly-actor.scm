@@ -74,6 +74,7 @@
     (actor ma* ...)
     (match e ma* ...)
     (recv ma* ...)
+    (call e0 e1 ma* ...)
     (let (ma* ...) e))
   (MatchArm (ma) (p e))
   (ActorDef (ad) (define (bv) ma* ...))
@@ -172,8 +173,7 @@
   (extends Ltagged)
   (terminals
     (- (fun (f)))
-    (+ (primfun (pf)))
-    (+ (cont (k))))
+    (+ (primfun (pf))))
   (Value (v)
     (+ (sys s)))
   (Expr (e)
@@ -181,22 +181,14 @@
     (+ (pf))
     (- (f e* ...))
     (+ (pf e* ...))
-    (- (recv ma* ...))
-    (+ (with/cc (k) e))
-    (+ (continue k e))
-    (- (let (ma* ...) e))))
+    (- (let (ma* ...) e))
+    (- (call e0 e1 ma* ...))))
 
 (define-pass desugar : Ltagged (l) -> Ldesugared ()
-  (definitions
-    (define cont-counter 0)
-    (define (fresh-cont)
-      (let* ([c cont-counter]
-             [k (string->symbol (format "_cont-~s" c))])
-        (set! cont-counter (+ c 1)) k)))
   (Pattern : Pattern (p) -> Pattern ())
-  (MatchArm : MatchArm (ma) -> MatchArm ())
   (split-arm : MatchArm (ma) -> * ()
     [(,p ,e) (cons p e)])
+  (MatchArm : MatchArm (ma) -> MatchArm ())
   (Expr : Expr (e) -> Expr ()
     [(,f) `(,f)]
     [(,f ,e* ...)
@@ -212,13 +204,35 @@
          [else
            (let ([arm (split-arm (car mas))])
            `(match ,(Expr (cdr arm)) (,(Pattern (car arm)) ,(go (cdr mas)))))]))]
+    [(call ,e0 ,e1 ,ma* ...)
+     `(seq (send ,(Expr e0) ,(Expr e1)) (recv ,(map MatchArm ma*) ...))]
+    ))
+
+(define-language
+  Lconts
+  (extends Ldesugared)
+  (terminals
+    (+ (cont (k))))
+  (Expr (e)
+    (- (recv ma* ...))
+    (+ (with/cc (k) e))
+    (+ (continue k e))))
+
+(define-pass continuation-constructs : Ldesugared (l) -> Lconts ()
+  (definitions
+    (define cont-counter 0)
+    (define (fresh-cont)
+      (let* ([c cont-counter]
+             [k (string->symbol (format "_cont-~s" c))])
+        (set! cont-counter (+ c 1)) k)))
+  (MatchArm : MatchArm (ma) -> MatchArm ())
+  (Expr : Expr (e) -> Expr ()
     [(recv ,ma* ...)
      (let ([k (fresh-cont)])
        `(with/cc (,k)
           (become
             (actor [_ (continue ,k (match (msg) ,(map MatchArm ma*) ...))])
-            (state))))]
-    ))
+            (state))))]))
 
 (define primfun-to-monadfun
   '((stop 0 stopM)
@@ -239,7 +253,7 @@
 
 (define-language
   Lmonad
-  (extends Ldesugared)
+  (extends Lconts)
   (terminals
     (- (primfun (pf)))
     (+ (monadfun (mf)))
@@ -267,7 +281,7 @@
     (- (continue k e))
     (+ (continue k v))))
 
-(define-pass to-monad : Ldesugared (l) -> Lmonad ()
+(define-pass to-monad : Lconts (l) -> Lmonad ()
   (definitions
     (define anf-counter 0)
     (define (fresh-anf-var)
