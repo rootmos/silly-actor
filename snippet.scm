@@ -5,7 +5,8 @@
                 (to-monad
                   (desugar
                     (tag-values
-                      (parse-Lsrc x)))))])
+                      (list-to-cons+nil
+                        (parse-Lsrc x))))))])
     ;(pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 
@@ -23,14 +24,14 @@
 (test
   (lambda (p)
     `(system
-       [(init Main '()) (output-port ,p)]
+       [(init Main ()) (output-port ,p)]
        (define (Main) [Init (output (state))])))
   '('()))
 
 (test
   (lambda (p)
     `(system
-       [(init Main '()) (output-port ,p)]
+       [(init Main ()) (output-port ,p)]
        (define (Main) [_ (seq (output 1) (output 2))])))
   '((number . 1) (number . 2)))
 
@@ -44,14 +45,14 @@
 (test
   (lambda (p)
     `(system
-       [(init Main '()) (output-port ,p)]
+       [(init Main ()) (output-port ,p)]
        (define (Main) [8 (output success)] [_ (send (self) 8)])))
   '((atom . success)))
 
 (test
   (lambda (p)
     `(system
-       [(init Main '()) (output-port ,p)]
+       [(init Main ()) (output-port ,p)]
        (define (Main)
          [_ (seq
               (send (self) 8)
@@ -61,22 +62,29 @@
 (test
   (lambda (p)
     `(system
-       [(init Main '()) (output-port ,p)]
-       (define (Aux) [7 (output (state))] [_ '()])
+       [(init Main ()) (output-port ,p)]
+       (define (Aux) [7 (output (state))] [_ ()])
        (define (Main) [_ (let ([Id (spawn Aux success)]) (send Id 7))])))
   '((atom . success)))
 
 (test
   (lambda (p)
     `(system
-       [(init Main '()) (output-port ,p)]
-       (define (Aux) [7 (output (state))] [_ '()])
+       [(init Main ()) (output-port ,p)]
+       (define (Aux) [7 (output (state))] [_ ()])
        (define (Main) [_ (send (spawn Aux success) 7)])))
   '((atom . success)))
 
 (test
   (lambda (p)
     `(system
-       [(init Main '()) (output-port ,p)]
+       [(init Main ()) (output-port ,p)]
        (define (Main) [_ (let ([X 7]) (match 7 ['X (output success)]))])))
   '((atom . success)))
+
+(test
+  (lambda (p)
+    `(system
+       [(init Main ()) (output-port ,p)]
+       (define (Main) [_ (match (list 1 2) [(list X _) (output X)])])))
+  '((number . 1)))

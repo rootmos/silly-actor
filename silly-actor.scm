@@ -41,6 +41,7 @@
   Lsrc
   (terminals
     (atom (a))
+    (null (null))
     (sys (s))
     (number (n))
     (wildcard-pattern (wp))
@@ -55,12 +56,12 @@
     bv
     (quote bv)
     wp
-    '()
+    null
     (list p* ...))
   (Value (v)
     a
     n
-    '()
+    null
     (list v* ...))
   (Expr (e)
     v
@@ -79,9 +80,39 @@
     (output-port op))
   (System (t) (system (o* ...) ad* ...)))
 
+(define-parser parse-Lsrc Lsrc)
+
+(define-language
+  Lcons+nil
+  (extends Lsrc)
+  (Pattern (p)
+    (- (list p* ...))
+    (+ (cons p0 p1)))
+  (Value (v)
+    (- (list v* ...))
+    (+ (cons v0 v1)))
+  (Expr (e)
+    (- (list e* ...))
+    (+ (cons e0 e1))))
+
+(define-pass list-to-cons+nil : Lsrc (l) -> Lcons+nil ()
+  (Pattern : Pattern (p) -> Pattern ()
+    [(list ,p* ...)
+     (let go ([ps p*])
+       (cond
+         [(null? ps) '()]
+         [else `(cons ,(Pattern (car ps)) ,(go (cdr ps)))]))])
+  (Value : Value (v) -> Value ()
+    [(list ,v* ...)
+     (let go ([vs v*])
+       (cond
+         [(null? vs) '()]
+         [else `(cons ,(Value (car vs)) ,(go (cdr vs)))]))])
+)
+
 (define-language
   Ltagged
-  (extends Lsrc)
+  (extends Lcons+nil)
   (Pattern (p)
     (- a)
     (+ (atom a))
@@ -104,8 +135,8 @@
     (- bv)
     (+ (var bv))))
 
-(define-pass tag-values : Lsrc (l) -> Ltagged ()
-  (Pattern : Pattern (v) -> Pattern ()
+(define-pass tag-values : Lcons+nil (l) -> Ltagged ()
+  (Pattern : Pattern (p) -> Pattern ()
     [,n `(number ,n)]
     [,a `(atom ,a)]
     [,s `(sys ,s)]
@@ -118,8 +149,6 @@
     [,v `(value ,(Value v))]
     [,bv `(var ,bv)])
   )
-
-(define-parser parse-Lsrc Lsrc)
 
 (define (primfun? x)
   (list? (member x '(stop spawn send become from msg parent state
@@ -202,7 +231,7 @@
     (- (pf e* ...))
     (+ (mf v* ...))
     (- (seq e* ...))
-    (- (list e* ...))
+    (- (cons e0 e1))
     (- (match e ma* ...))
     (+ (match v ma* ...))))
 
@@ -281,15 +310,15 @@
     [(var ,bv) `'(var . ,bv)]
     [(sys ,s) `'(sys . ,s)]
     [,wp ''wildcard]
-    ['() ''()]
-    [(list ,p* ...) (cons 'list (map Pattern p*))])
+    [,null ''()]
+    [(cons ,p0 ,p1) `(list 'cons ,(Pattern p0) ,(Pattern p1))])
   (Value : Value (v) -> * ()
     [(atom ,a) `'(atom . ,a)]
     [(sys ,s) `',s]
     [(anf-val ,av) av]
     [(number ,n) `'(number . ,n)]
-    ['() ''()]
-    [(list ,v* ...) (cons 'list (map Value v*))])
+    [,null ''()]
+    [(cons ,v0 ,v1) `(list 'cons ,(Value v0) ,(Value v1))])
   (Expr : Expr (e) -> * ()
     [(point ,v) (list 'point (Value v))]
     [(match ,v ,ma* ...)

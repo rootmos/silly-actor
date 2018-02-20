@@ -91,19 +91,21 @@
 
   (define (match x p env)
     (cond
-      [(eqv? 'wildcard p) '()]
+      [(eqv? 'wildcard p) env]
       [(and (pair? p) (pair? x)
             (eqv? (car p) (car x))
-            (eqv? (cdr p) (cdr x))) '()]
-      [(and (eqv? p '()) (eqv? x '())) '()]
+            (eqv? (cdr p) (cdr x))) env]
+      [(and (eqv? p '()) (eqv? x '())) env]
       [(and (pair? p) (eqv? (car p) 'bind)) (list (cons (cdr p) x))]
       [(and (pair? p) (eqv? (car p) 'var))
-       (cond [(equal? x (lookup (cdr p) env)) '()]
+       (cond [(equal? x (lookup (cdr p) env)) env]
              [else #f])]
-      [(and (pair? p) (eqv? (car p) 'list) (list? (cdr p))
-            (pair? x) (eqv? (car x) 'list) (list? (cdr x))
-            (eqv? (length (cdr p)) (length (cdr x))))
-       (ni 'match)]
+      [(and (list? p) (eqv? (car p) 'cons)
+            (list? x) (eqv? (car x) 'cons))
+       (cond
+         [(match (cadr x) (cadr p) env) =>
+          (lambda (e) (match (caddr x) (caddr p) e))]
+         [else #f])]
       [else #f]))
 
   (define (matchM x ps)
