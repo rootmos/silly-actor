@@ -73,6 +73,7 @@
     (seq e* ...)
     (actor ma* ...)
     (match e ma* ...)
+    (recv ma* ...)
     (let (ma* ...) e))
   (MatchArm (ma) (p e))
   (ActorDef (ad) (define (bv) ma* ...))
@@ -159,12 +160,20 @@
   (list? (member x '(stop spawn send become from msg parent state
                           self this-closure))))
 
+(define (cont? x)
+  (and
+    [symbol? x]
+    [>= (string-length (symbol->string x)) 6]
+    [equal? (substring (symbol->string x) 0 6) "_cont-"]
+    ))
+
 (define-language
   Ldesugared
   (extends Ltagged)
   (terminals
     (- (fun (f)))
-    (+ (primfun (pf))))
+    (+ (primfun (pf)))
+    (+ (cont (k))))
   (Value (v)
     (+ (sys s)))
   (Expr (e)
@@ -172,10 +181,20 @@
     (+ (pf))
     (- (f e* ...))
     (+ (pf e* ...))
+    (- (recv ma* ...))
+    (+ (with/cc (k) e))
+    (+ (continue k e))
     (- (let (ma* ...) e))))
 
 (define-pass desugar : Ltagged (l) -> Ldesugared ()
+  (definitions
+    (define cont-counter 0)
+    (define (fresh-cont)
+      (let* ([c cont-counter]
+             [k (string->symbol (format "_cont-~s" c))])
+        (set! cont-counter (+ c 1)) k)))
   (Pattern : Pattern (p) -> Pattern ())
+  (MatchArm : MatchArm (ma) -> MatchArm ())
   (split-arm : MatchArm (ma) -> * ()
     [(,p ,e) (cons p e)])
   (Expr : Expr (e) -> Expr ()
@@ -193,6 +212,12 @@
          [else
            (let ([arm (split-arm (car mas))])
            `(match ,(Expr (cdr arm)) (,(Pattern (car arm)) ,(go (cdr mas)))))]))]
+    [(recv ,ma* ...)
+     (let ([k (fresh-cont)])
+       `(with/cc (,k)
+          (become
+            (actor [_ (continue ,k (match (msg) ,(map MatchArm ma*) ...))])
+            (state))))]
     ))
 
 (define primfun-to-monadfun
@@ -238,7 +263,9 @@
     (- (seq e* ...))
     (- (cons e0 e1))
     (- (match e ma* ...))
-    (+ (match v ma* ...))))
+    (+ (match v ma* ...))
+    (- (continue k e))
+    (+ (continue k v))))
 
 (define-pass to-monad : Ldesugared (l) -> Lmonad ()
   (definitions
@@ -305,6 +332,9 @@
     [(match ,e ,ma* ...)
      (let ([a (fresh-anf-var)])
        `(>>= ,(Expr e) (,a) (match ,(mk-anf-val a) ,(map MatchArm ma*) ...)))]
+    [(continue ,k ,e)
+     (let ([a (fresh-anf-var)])
+       `(>>= ,(Expr e) (,a) (continue ,k ,(mk-anf-val a))))]
     ))
 
 (define-pass output-scheme : Lmonad (l) -> * ()
@@ -333,7 +363,9 @@
     [(>>= ,e0 (,av) ,e1) `(>>= ,(Expr e0) (lambda (,av) ,(Expr e1)))]
     [(>> ,e0 ,e1) `(>> ,(Expr e0) ,(Expr e1))]
     [(var ,bv) `(lookupM ',bv)]
-    [(close ,e) `(closeM ,(Expr e))])
+    [(close ,e) `(closeM ,(Expr e))]
+    [(continue ,k ,v) `(continueM ',k ,(Value v))]
+    [(with/cc (,k) ,e) `(with/ccM ',k ,(Expr e))])
   (MatchArm : MatchArm (ma) -> * ()
     [(,p ,e) `(cons ,(Pattern p) ,(Expr e))])
   (ActorDef : ActorDef (ad) -> * ()

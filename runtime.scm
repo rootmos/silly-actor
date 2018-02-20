@@ -3,6 +3,7 @@
           stateM msgM fromM selfM
           lookupM matchM closeM
           becomeM spawnM sendM stopM
+          with/ccM continueM
           run-system)
   (import (chezscheme))
 
@@ -75,6 +76,11 @@
   (define fromM (lambda (ctx env) (values (ctx-from ctx) env)))
   (define selfM (lambda (ctx env) (values (a-id (ctx-a ctx)) env)))
 
+  (define (with/ccM kv m)
+    (lambda (ctx env)
+      (values (call/cc (lambda (k) (m ctx (cons (cons kv k) env)))) env)))
+  (define (continueM kv v) (lambda (ctx env) ((lookup kv env) v)))
+
   (define (die ctx e)
     (let* ([a (ctx-a ctx)] [to (a-parent-id a)])
       (send-message a to (cons '(sys . Died) e))
@@ -96,7 +102,7 @@
             (eqv? (car p) (car x))
             (eqv? (cdr p) (cdr x))) env]
       [(and (eqv? p '()) (eqv? x '())) env]
-      [(and (pair? p) (eqv? (car p) 'bind)) (list (cons (cdr p) x))]
+      [(and (pair? p) (eqv? (car p) 'bind)) (cons (cons (cdr p) x) env)]
       [(and (pair? p) (eqv? (car p) 'var))
        (cond [(equal? x (lookup (cdr p) env)) env]
              [else #f])]

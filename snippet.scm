@@ -88,3 +88,24 @@
        [(init Main ()) (output-port ,p)]
        (define (Main) [_ (match '(1 2) [(X _) (output X)])])))
   '((number . 1)))
+
+(test
+  (lambda (p)
+    `(system
+       [(init Main ()) (output-port ,p)]
+       (define (Aux) [7 (reply 8)] [_ ()])
+       (define (Main)
+         [_ (seq (send (spawn Aux ()) 7) (output (recv [8 success])))])))
+  '((atom . success)))
+
+(test
+  (lambda (p)
+    `(system
+       [(init Main ()) (output-port ,p)]
+       (define (Aux) [7 (reply 8)] [9 (reply 10)] [_ ()])
+       (define (Main)
+         [_ (let ([Id (spawn Aux ())])
+              (seq
+                (send Id 7) (output (recv [8 a]))
+                (send Id 9) (output (recv [10 b]))))])))
+  '((atom . a) (atom . b)))
