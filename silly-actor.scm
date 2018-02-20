@@ -159,7 +159,7 @@
 
 (define (primfun? x)
   (list? (member x '(stop spawn send become from msg parent state
-                          self this-closure))))
+                          self current-behavior))))
 
 (define (cont? x)
   (and
@@ -193,9 +193,11 @@
     [(,f) `(,f)]
     [(,f ,e* ...)
      (case f
-       ['stay `(become (this-closure) ,(map Expr e*) ...)]
+       ['stay `(become (current-behavior) ,(map Expr e*) ...)]
        ['output `(send (value (sys Output)) ,(map Expr e*) ...)]
-       ['reply `(send (from) ,(map Expr e*) ...)]
+       ['reply
+        `(seq (send (from) ,(map Expr e*) ...)
+              (become (current-behavior) (state)))]
        [else `(,f ,(map Expr e*) ...)])]
     [(let (,ma* ...) ,e)
      (let go ([mas ma*])
@@ -244,12 +246,12 @@
     (parent 0 parentM)
     (state 0 stateM)
     (self 0 selfM)
-    (this-closure 0 this-closureM)
+    (current-behavior 0 current-closureM)
     ))
 
 (define (monadfun? x)
   (list? (member x '(stopM spawnM sendM becomeM
-                           fromM msgM parentM stateM selfM this-closureM))))
+                     fromM msgM parentM stateM selfM current-closureM))))
 
 (define-language
   Lmonad

@@ -103,7 +103,7 @@
   (lambda (p)
     `(system
        [(init Main ()) (output-port ,p)]
-       (define (Aux) [7 (reply 8)] [9 (reply 10)] [_ ()])
+       (define (Aux) [7 (seq (reply 8) (reply 13))] [9 (reply 10)] [_ ()])
        (define (Main)
          [_ (let ([Id (spawn Aux ())])
               (seq

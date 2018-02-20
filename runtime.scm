@@ -1,6 +1,6 @@
 (library (runtime)
   (export >>= >> point
-          stateM msgM fromM selfM
+          stateM msgM fromM selfM current-closureM
           lookupM matchM closeM
           becomeM spawnM sendM stopM
           with/ccM continueM
@@ -75,6 +75,7 @@
   (define msgM (lambda (ctx env) (values (ctx-msg ctx) env)))
   (define fromM (lambda (ctx env) (values (ctx-from ctx) env)))
   (define selfM (lambda (ctx env) (values (a-id (ctx-a ctx)) env)))
+  (define current-closureM (lambda (ctx env) (values (a-cl (ctx-a ctx)) env)))
 
   (define (with/ccM kv m)
     (lambda (ctx env)
