@@ -159,7 +159,7 @@
 
 (define (primfun? x)
   (list? (member x '(stop spawn send become from msg parent state
-                          self current-behavior))))
+                          self set-state! yield))))
 
 (define (cont? x)
   (and
@@ -193,11 +193,12 @@
     [(,f) `(,f)]
     [(,f ,e* ...)
      (case f
-       ['stay `(become (current-behavior) ,(map Expr e*) ...)]
+       ['become
+        (let ([b (car e*)] [s (cadr e*)])
+          `(seq (set-state! ,(Expr s)) (become ,(Expr b))))]
+       ['stay `(seq (set-state! ,(Expr (car e*))) (yield))]
        ['output `(send (value (sys Output)) ,(map Expr e*) ...)]
-       ['reply
-        `(seq (send (from) ,(map Expr e*) ...)
-              (become (current-behavior) (state)))]
+       ['reply `(seq (send (from) ,(map Expr e*) ...) (yield))]
        [else `(,f ,(map Expr e*) ...)])]
     [(let (,ma* ...) ,e)
      (let go ([mas ma*])
@@ -234,24 +235,24 @@
        `(with/cc (,k)
           (become
             (actor [_ (continue ,k (match (msg) ,(map MatchArm ma*) ...))])
-            (state))))]))
+            )))]))
 
 (define primfun-to-monadfun
   '((stop 0 stopM)
     (spawn 2 spawnM)
     (send 2 sendM)
-    (become 2 becomeM)
+    (become 1 becomeM)
     (from 0 fromM)
     (msg 0 msgM)
     (parent 0 parentM)
     (state 0 stateM)
     (self 0 selfM)
-    (current-behavior 0 current-closureM)
+    (set-state! 1 set-stateM)
+    (yield 0 yieldM)
     ))
 
 (define (monadfun? x)
-  (list? (member x '(stopM spawnM sendM becomeM
-                     fromM msgM parentM stateM selfM current-closureM))))
+  (list? (member x (map caddr primfun-to-monadfun))))
 
 (define-language
   Lmonad

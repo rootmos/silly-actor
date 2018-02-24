@@ -1,9 +1,9 @@
 (library (runtime)
   (export >>= >> point
-          stateM msgM fromM selfM current-closureM
+          stateM msgM fromM selfM set-stateM
           lookupM matchM closeM
           becomeM spawnM sendM stopM
-          with/ccM continueM
+          with/ccM continueM yieldM
           run-system)
   (import (chezscheme))
 
@@ -75,7 +75,6 @@
   (define msgM (lambda (ctx env) (values (ctx-msg ctx) env)))
   (define fromM (lambda (ctx env) (values (ctx-from ctx) env)))
   (define selfM (lambda (ctx env) (values (a-id (ctx-a ctx)) env)))
-  (define current-closureM (lambda (ctx env) (values (a-cl (ctx-a ctx)) env)))
 
   (define (with/ccM kv m)
     (lambda (ctx env)
@@ -126,12 +125,15 @@
 
   (define (closeM m) (lambda (ctx env) (values (make-cl m env) env)))
 
-  (define (becomeM cl st)
+  (define yieldM (lambda (ctx env) ((ctx-k ctx))))
+
+  (define (becomeM cl)
     (lambda (ctx env)
-      (let ([a (ctx-a ctx)])
-        (a-cl-set! a cl)
-        (a-state-set! a st)
-        ((ctx-k ctx)))))
+      (begin (a-cl-set! (ctx-a ctx) cl) (yieldM ctx env))))
+
+  (define (set-stateM st)
+    (lambda (ctx env)
+      (begin (a-state-set! (ctx-a ctx) st) (values '() env))))
 
   (define (spawnM cl st)
     (lambda (ctx env)
@@ -147,7 +149,7 @@
       (let* ([a (ctx-a ctx)] [to (a-parent-id a)] [s (a-system a)])
         (send-message a to '(sys . Stopped))
         (remove-actor a)
-        ((ctx-k ctx)))))
+        (yieldM ctx env))))
 
   (define (run-system os root-defs)
     (let* ([root-env (fold-left (lambda (env d)
