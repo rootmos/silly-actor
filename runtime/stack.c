@@ -50,15 +50,16 @@ void stack_push(struct stack* st, void* p)
 
     if (st->fork) {
         block->slots[sp0].fork_count -= 1;
-        block->slots[sp1].fork_count += 1;
 
         if (sp0 == block->msp && !block->claimed) {
             block->claimed = true;
             st->fork = false;
             block->msp += 1;
+        } else {
+            block->slots[sp1].fork_count += 1;
         }
 
-        not_implemented();
+        block->slots[sp1].p = p;
     } else {
         block->msp += 1;
         block->slots[sp1].p = p;
@@ -254,6 +255,30 @@ test_case(push_fork_pop_fork)
     assert(!st->fork);
 }
 test_case_end(push_fork_pop_fork)
+
+test_case(push_fork_claim)
+{
+    struct stack* st = stack_fresh();
+    fresh(void*, p0); stack_push(st, p0);
+    fresh(void*, p1); stack_push(st, p1);
+
+    struct stack* f = stack_fork(st);
+    stack_pop(st);
+    assert(!st->block->claimed);
+    assert(f->fork);
+    assert(st->fork);
+
+    fresh(void*, p2); stack_push(f, p2);
+    assert(st->block == f->block);
+    assert(f->block->msp == 2);
+    assert(f->block->slots[0].fork_count == 0);
+    assert(f->block->slots[1].fork_count == 0);
+    assert(f->block->slots[2].fork_count == 0);
+    assert(f->block->claimed);
+    assert(!f->fork);
+    assert(st->fork);
+}
+test_case_end(push_fork_claim)
 
 test_suite_end()
 
