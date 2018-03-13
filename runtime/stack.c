@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct slot {
     void* p;
@@ -34,8 +35,7 @@ struct stack* stack_fresh()
     size_t block_size =
         sizeof(struct block) +
         STACK_NO_INITIAL_SLOTS * sizeof(struct slot);
-    struct block* b = st->block =
-        (struct block*)calloc(block_size, 1);
+    struct block* b = st->block = (struct block*)calloc(block_size, 1);
     b->claimed = true;
     b->msp = st->sp;
     b->N = STACK_NO_INITIAL_SLOTS;
@@ -51,19 +51,22 @@ void stack_push(struct stack* st, void* p)
     if (st->fork) {
         block->slots[sp0].fork_count -= 1;
 
-        if (sp0 == block->msp && !block->claimed) {
-            block->claimed = true;
-            st->fork = false;
-            block->msp += 1;
-        } else {
-            block->slots[sp1].fork_count += 1;
+        if (sp0 != block->msp || block->claimed) {
+            size_t block_size =
+                sizeof(struct block) + block->N * sizeof(struct slot);
+            st->block = (struct block*)calloc(block_size, 1);
+            st->block->msp = sp0;
+            memcpy(st->block->slots, block->slots,
+                   (1 + sp0) * sizeof(struct slot));
+            block = st->block;
         }
-
+        st->fork = false;
+        block->claimed = true;
+        block->msp += 1;
         block->slots[sp1].p = p;
     } else {
         block->msp += 1;
         block->slots[sp1].p = p;
-        /* TODO: clear fork_count - test it! */
     }
 }
 
@@ -305,6 +308,40 @@ test_case(push_fork_claim)
     assert(st->fork);
 }
 test_case_end(push_fork_claim)
+
+test_case(push_fork_clone)
+{
+    struct stack* st = stack_fresh();
+    fresh(void*, p0); stack_push(st, p0);
+    fresh(void*, p1); stack_push(st, p1);
+
+    struct stack* f = stack_fork(st);
+    assert(f->fork);
+    assert(!st->fork);
+    assert(f->block->slots[1].fork_count == 1);
+
+    fresh(void*, p2); stack_push(f, p2);
+    assert(st->block != f->block);
+
+    assert(!f->fork);
+    assert(stack_nth(f, 0) == p2);
+    assert(stack_nth(f, 1) == p1);
+    assert(stack_nth(f, 2) == p0);
+    assert(f->block->msp == 2);
+    assert(f->block->claimed);
+    assert(f->block->slots[0].fork_count == 0);
+    assert(f->block->slots[1].fork_count == 0);
+    assert(f->block->slots[2].fork_count == 0);
+
+    assert(!st->fork);
+    assert(stack_nth(st, 0) == p1);
+    assert(stack_nth(st, 1) == p0);
+    assert(st->block->msp == 1);
+    assert(st->block->claimed);
+    assert(st->block->slots[0].fork_count == 0);
+    assert(st->block->slots[1].fork_count == 0);
+}
+test_case_end(push_fork_clone)
 
 test_suite_end()
 
