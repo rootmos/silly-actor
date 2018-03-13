@@ -56,6 +56,7 @@ void stack_push(struct stack* st, void* p)
                 sizeof(struct block) + block->N * sizeof(struct slot);
             st->block = (struct block*)calloc(block_size, 1);
             st->block->msp = sp0;
+            st->block->N = block->N;
             memcpy(st->block->slots, block->slots,
                    (1 + sp0) * sizeof(struct slot));
             block = st->block;
@@ -98,6 +99,9 @@ void stack_pop(struct stack* st)
 
 void* stack_nth(const struct stack* st, size_t n)
 {
+    if(n >= st->block->N)
+        failwith("stack overflow (implement growing blocks)");
+
     return st->block->slots[st->sp - n].p;
 }
 
