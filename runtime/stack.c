@@ -123,28 +123,39 @@ test_case(stack_fresh)
         assert(st->block->slots[i].p == NULL);
         assert(st->block->slots[i].fork_count == 0);
     }
-    ok = true;
 }
 test_case_end(stack_fresh);
 
 test_case(stack_push)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p1);
-    stack_push(st, p1);
+    fresh(void*, p0);
+    stack_push(st, p0);
     assert(st->sp == 0);
     assert(st->block->msp == 0);
-    assert(st->block->slots[0].p == p1);
+    assert(st->block->slots[0].p == p0);
 
-    fresh(void*, p2);
-    stack_push(st, p2);
+    fresh(void*, p1);
+    stack_push(st, p1);
     assert(st->sp == 1);
     assert(st->block->msp == 1);
-    assert(st->block->slots[1].p == p2);
-
-    ok = true;
+    assert(st->block->slots[1].p == p1);
 }
 test_case_end(stack_push);
+
+test_case(stack_nth)
+{
+    struct stack* st = stack_fresh();
+    fresh(void*, p0);
+    stack_push(st, p0);
+    assert(stack_nth(st, 0) == p0);
+
+    fresh(void*, p1);
+    stack_push(st, p1);
+    assert(stack_nth(st, 0) == p1);
+    assert(stack_nth(st, 1) == p0);
+}
+test_case_end(stack_nth);
 
 test_suite_end()
 

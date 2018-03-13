@@ -11,7 +11,7 @@
 #define test_suite_end() exit(0); }
 
 #define test_case(n) void n##_test_case() { \
-    volatile bool ok = false; \
+    volatile bool ok = true; \
     printf("%s - starting\n", __extension__ __FUNCTION__);
 #define test_case_end(n) \
     assert(ok); printf("%s - ok\n", __extension__ __FUNCTION__); } \
