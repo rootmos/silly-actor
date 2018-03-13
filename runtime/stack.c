@@ -117,8 +117,9 @@ test_case(stack_fresh)
 {
     struct stack* st = stack_fresh();
     assert(st != NULL);
-    assert(st->fork == false);
+    assert(!st->fork);
     assert(st->sp == -1);
+    assert(st->block->claimed);
     assert(st->block->N == STACK_NO_INITIAL_SLOTS);
     assert(st->block->msp == -1);
     for (size_t i = 0; i < st->block->N; i++) {
@@ -179,18 +180,20 @@ test_case(fork_empty_stack)
     assert(st != f);
     assert(st->block != f->block);
 
-    assert(st->fork == false);
+    assert(!st->fork);
     assert(st->sp == -1);
     assert(st->block->N == STACK_NO_INITIAL_SLOTS);
+    assert(st->block->claimed);
     assert(st->block->msp == -1);
     for (size_t i = 0; i < st->block->N; i++) {
         assert(st->block->slots[i].p == NULL);
         assert(st->block->slots[i].fork_count == 0);
     }
 
-    assert(f->fork == false);
+    assert(!f->fork);
     assert(f->sp == -1);
     assert(f->block->N == STACK_NO_INITIAL_SLOTS);
+    assert(f->block->claimed);
     assert(f->block->msp == -1);
     for (size_t i = 0; i < f->block->N; i++) {
         assert(f->block->slots[i].p == NULL);
@@ -207,13 +210,50 @@ test_case(fork_non_empty_stack)
 
     struct stack* f = stack_fork(st);
     assert(f != st);
+    assert(f->fork);
+    assert(!st->fork);
     assert(f->sp == st->sp);
     assert(f->block == st->block);
+    assert(f->block->claimed);
     assert(f->block->slots[0].fork_count == 1);
     assert(stack_nth(st, 0) == p0);
     assert(stack_nth(f, 0) == p0);
 }
 test_case_end(fork_non_empty_stack)
+
+test_case(push_fork_pop)
+{
+    struct stack* st = stack_fresh();
+    fresh(void*, p0); stack_push(st, p0);
+    fresh(void*, p1); stack_push(st, p1);
+
+    struct stack* f = stack_fork(st);
+    stack_pop(st);
+    assert(stack_nth(f, 0) == p1);
+    assert(stack_nth(st, 0) == p0);
+    assert(f->block->slots[1].fork_count == 1);
+    assert(f->block->slots[0].fork_count == 0);
+    assert(!st->block->claimed);
+    assert(st->fork);
+}
+test_case_end(push_fork_pop)
+
+test_case(push_fork_pop_fork)
+{
+    struct stack* st = stack_fresh();
+    fresh(void*, p0); stack_push(st, p0);
+    fresh(void*, p1); stack_push(st, p1);
+
+    struct stack* f = stack_fork(st);
+    stack_pop(f);
+    assert(stack_nth(f, 0) == p0);
+    assert(stack_nth(st, 0) == p1);
+    assert(f->block->slots[1].fork_count == 0);
+    assert(f->block->slots[0].fork_count == 1);
+    assert(st->block->claimed);
+    assert(!st->fork);
+}
+test_case_end(push_fork_pop_fork)
 
 test_suite_end()
 
