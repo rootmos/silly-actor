@@ -98,6 +98,8 @@ void* stack_nth(const struct stack* st, size_t n)
 
 struct stack* stack_fork(const struct stack* st)
 {
+    if (st->sp == -1) return stack_fresh();
+
     struct stack* tt = (struct stack*)malloc(sizeof(*tt));
     tt->block = st->block;
     tt->sp = st->sp;
@@ -169,6 +171,49 @@ test_case(stack_pop)
     assert(st->block->msp == -1);
 }
 test_case_end(stack_pop);
+
+test_case(fork_empty_stack)
+{
+    struct stack* st = stack_fresh();
+    struct stack* f = stack_fork(st);
+    assert(st != f);
+    assert(st->block != f->block);
+
+    assert(st->fork == false);
+    assert(st->sp == -1);
+    assert(st->block->N == STACK_NO_INITIAL_SLOTS);
+    assert(st->block->msp == -1);
+    for (size_t i = 0; i < st->block->N; i++) {
+        assert(st->block->slots[i].p == NULL);
+        assert(st->block->slots[i].fork_count == 0);
+    }
+
+    assert(f->fork == false);
+    assert(f->sp == -1);
+    assert(f->block->N == STACK_NO_INITIAL_SLOTS);
+    assert(f->block->msp == -1);
+    for (size_t i = 0; i < f->block->N; i++) {
+        assert(f->block->slots[i].p == NULL);
+        assert(f->block->slots[i].fork_count == 0);
+    }
+}
+test_case_end(fork_empty_stack)
+
+test_case(fork_non_empty_stack)
+{
+    struct stack* st = stack_fresh();
+    fresh(void*, p0); stack_push(st, p0);
+    assert(st->block->slots[0].fork_count == 0);
+
+    struct stack* f = stack_fork(st);
+    assert(f != st);
+    assert(f->sp == st->sp);
+    assert(f->block == st->block);
+    assert(f->block->slots[0].fork_count == 1);
+    assert(stack_nth(st, 0) == p0);
+    assert(stack_nth(f, 0) == p0);
+}
+test_case_end(fork_non_empty_stack)
 
 test_suite_end()
 
