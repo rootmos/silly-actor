@@ -1,6 +1,6 @@
 test: stack_test
 
-stack_test: stack.o common.o
+stack_test: stack.o common.o tests.o
 	gcc -nostartfiles -o $@ -Wl,-e$@_suite $^
 	./$@
 

@@ -16,3 +16,8 @@
 #define test_case_end(n) \
     assert(ok); printf("%s - ok\n", __extension__ __FUNCTION__); } \
     n##_test_case();
+
+void fill_with_random(void* p, size_t n);
+void* random_blob(size_t n);
+
+#define fresh(t, v) t v; do { fill_with_random(&v, sizeof(v)); } while (0)

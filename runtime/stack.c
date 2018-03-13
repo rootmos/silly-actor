@@ -13,7 +13,7 @@ struct slot {
 struct block {
     bool claimed;
     size_t N;
-    size_t msp;
+    size_t msp; /* TODO: maybe set this as a *size_t to the owners sp? */
     struct slot slots[];
 };
 
@@ -28,7 +28,7 @@ struct stack {
 struct stack* stack_fresh()
 {
     struct stack* st = (struct stack*)malloc(sizeof(*st));
-    st->sp = 0;
+    st->sp = -1;
     st->fork = false;
 
     size_t block_size =
@@ -37,22 +37,22 @@ struct stack* stack_fresh()
     struct block* b = st->block =
         (struct block*)calloc(block_size, 1);
     b->claimed = true;
-    b->msp = 0;
+    b->msp = st->sp;
     b->N = STACK_NO_INITIAL_SLOTS;
     return st;
 }
 
 void stack_push(struct stack* st, void* p)
 {
-    size_t sp = st->sp;
-    st->sp += 1;
+    size_t sp0 = st->sp;
+    size_t sp1 = st->sp += 1;
     struct block* block = st->block;
 
     if (st->fork) {
-        block->slots[sp].fork_count -= 1;
-        block->slots[st->sp].fork_count += 1;
+        block->slots[sp0].fork_count -= 1;
+        block->slots[sp1].fork_count += 1;
 
-        if (sp == block->msp && !block->claimed) {
+        if (sp0 == block->msp && !block->claimed) {
             block->claimed = true;
             st->fork = false;
             block->msp += 1;
@@ -60,7 +60,9 @@ void stack_push(struct stack* st, void* p)
 
         not_implemented();
     } else {
-        not_implemented();
+        block->msp += 1;
+        block->slots[sp1].p = p;
+        /* TODO: clear fork_count - test it! */
     }
 }
 
@@ -114,17 +116,35 @@ test_case(stack_fresh)
     struct stack* st = stack_fresh();
     assert(st != NULL);
     assert(st->fork == false);
-    assert(st->sp == 0);
+    assert(st->sp == -1);
     assert(st->block->N == STACK_NO_INITIAL_SLOTS);
-    assert(st->block->N == STACK_NO_INITIAL_SLOTS);
-    assert(st->block->msp == 0);
-    for (size_t i = 0; i < STACK_NO_INITIAL_SLOTS; i++) {
+    assert(st->block->msp == -1);
+    for (size_t i = 0; i < st->block->N; i++) {
         assert(st->block->slots[i].p == NULL);
         assert(st->block->slots[i].fork_count == 0);
     }
     ok = true;
 }
 test_case_end(stack_fresh);
+
+test_case(stack_push)
+{
+    struct stack* st = stack_fresh();
+    fresh(void*, p1);
+    stack_push(st, p1);
+    assert(st->sp == 0);
+    assert(st->block->msp == 0);
+    assert(st->block->slots[0].p == p1);
+
+    fresh(void*, p2);
+    stack_push(st, p2);
+    assert(st->sp == 1);
+    assert(st->block->msp == 1);
+    assert(st->block->slots[1].p == p2);
+
+    ok = true;
+}
+test_case_end(stack_push);
 
 test_suite_end()
 

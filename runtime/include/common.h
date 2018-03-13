@@ -4,7 +4,7 @@
 
 #define failwith(...) __failwith(__extension__ __FUNCTION__, __extension__ __FILE__, __extension__ __LINE__, __VA_ARGS__)
 
-#define not_implemented() failwith("not_implemented")
+#define not_implemented() failwith("not_implemented\n")
 
 void __failwith(const char* caller,
                 const char* file,
@@ -20,5 +20,10 @@ void __failwith(const char* caller,
 #define warn(...) do {                                          \
     fprintf(stderr, "%s:%d: ",                                  \
             __extension__ __FUNCTION__,__extension__ __LINE__); \
+    fprintf(stderr, __VA_ARGS__);                               \
+} while (0)
+
+#define debug(...) do {                                          \
+    fprintf(stderr, "%s:%s:%d: ", __extension__ __FUNCTION__,  __extension__ __FILE__, __extension__ __LINE__);         \
     fprintf(stderr, __VA_ARGS__);                               \
 } while (0)
