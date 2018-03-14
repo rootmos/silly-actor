@@ -395,3 +395,68 @@
      `(run-system
         ',(map Options o*)
         ,(cons 'list  (map ActorDef ad*)))]))
+
+(define-language
+  Lstack
+  (extends Lmonad)
+  (terminals
+    (- (anf-val (av)))
+    (- (bound-var (bv)))
+    (- (cont (k))))
+  (Pattern (p)
+    (- (var bv)) (+ (slot n))
+    (- (bind bv)) (+ (bind)))
+  (Value (v)
+    (- (anf-val av))
+    (+ (slot n)))
+  (ActorDef (ad)
+    (- (define (bv) e))
+    (+ (define e)))
+  (Expr (e)
+    (- (with/cc (k) e)) (+ (with/cc e))
+    (- (var bv))
+    (- (continue k v)) (+ (continue n v))
+    (- (>>= e0 (av) e1)) (+ (>>= e0 e1)))
+  (Options (o)
+    (- (init bv v)) (+ (init n v))))
+
+(define (index a b)
+  (let [(tail (member a (reverse b)))]
+    (and tail (length (cdr tail)))))
+
+(define-pass to-stack : Lmonad (l) -> Lstack ()
+  (Value : Value (v ctx) -> Value ()
+    [(anf-val ,av) `(slot ,(index av ctx))])
+  (Pattern : Pattern (p ctx) -> Pattern (ctx)
+    [(var ,bv) (values `(slot ,(index bv ctx)) ctx)]
+    [(bind ,bv) (values `(bind) (cons bv ctx))]
+    [(cons ,p0 ,p1)
+     (let*-values (([p0^ ctx^] (Pattern p0 ctx))
+                   ([p1^ ctx^^] (Pattern p1 ctx^)))
+       (values `(cons ,p0^ ,p1^) ctx^^))])
+  (MatchArm : MatchArm (ma ctx) -> MatchArm ()
+    [(,p ,e) (let-values ([(p^ ctx^) (Pattern p ctx)])
+               `(,p^ ,(Expr e ctx^)))])
+  (Expr : Expr (e ctx) -> Expr ()
+    [(var ,bv) `(point (slot ,(index bv ctx)))]
+    [(match ,v ,ma* ...)
+     `(match ,(Value v ctx)
+             ,(map (lambda (ma) (MatchArm ma ctx)) ma*) ...)]
+    [(with/cc (,k) ,e) `(with/cc ,(Expr e (cons k ctx)))]
+    [(continue ,k ,v) `(continue ,(index k ctx) ,(Value v ctx))]
+    [(>>= ,e0 (,av) ,e1) `(>>= ,(Expr e0 ctx) ,(Expr e1 (cons av ctx)))])
+  (ActorDef : ActorDef (ad ctx) -> ActorDef (ctx)
+    [(define (,bv) ,e) (values `(define ,(Expr e ctx)) (cons bv ctx))])
+  (Options : Options (o ctx) -> Options ()
+    [(init ,bv ,v) `(init ,(index bv ctx) ,(Value v ctx))])
+  (System : System (s) -> System ()
+    [(system (,o* ...) ,ad* ...)
+     (let* ([acc (fold-left
+                   (lambda (acc ad)
+                     (let-values ([(ad^ ctx^) (ActorDef ad (car acc))])
+                       (cons ctx^ (cons ad^ (cdr acc)))))
+                   (cons '() '()) ad*)]
+            [ad*^ (reverse (cdr acc))]
+            [ctx^ (car acc)]
+            [o*^ (map (lambda (o) (Options o ctx^)) o*)])
+       `(system (,o*^ ...) ,ad*^ ...))]))

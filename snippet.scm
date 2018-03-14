@@ -1,17 +1,29 @@
 (load "silly-actor.scm")
 
+
+(define passes '(parse-Lsrc
+                 list-to-cons+nil
+                 tag-values
+                 desugar
+                 continuation-constructs
+                 to-monad))
+
+(define (compile x)
+  (fold-left (lambda (x f) ((eval f) x)) x passes))
+
 (define (interp x)
-  (let ([code (output-scheme
-                (to-monad
-                  (continuation-constructs
-                    (desugar
-                      (tag-values
-                        (list-to-cons+nil
-                          (parse-Lsrc x)))))))])
+  (let ([code (output-scheme (compile x))])
     ;(pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 
+(define (show-Lstack code)
+  (pretty-print
+    (unparse-Lstack
+      (to-stack
+        (compile code)))))
+
 (define (test code expected)
+  (show-Lstack (code (current-output-port)))
   (let ([str (call-with-string-output-port (lambda (p) (interp (code p))))])
     (with-input-from-string str (lambda ()
       (let ([actual (reverse (let go ([acc '()])
