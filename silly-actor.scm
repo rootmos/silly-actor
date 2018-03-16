@@ -271,7 +271,6 @@
     (+ (close e))
     (- (value v))
     (+ (point v))
-    (+ (>> e0 e1))
     (+ (>>= e0 (av) e1))
     (- (pf))
     (+ mf)
@@ -344,7 +343,9 @@
      (let go ([es e*])
        (cond
          [(equal? (length es) 1) (Expr (car es))]
-         [else `(>> ,(Expr (car es)) ,(go (cdr es)))]))]
+         [else `(>>= ,(Expr (car es))
+                     (,(fresh-anf-var))
+                     ,(go (cdr es)))]))]
     [(actor ,ma* ...) `(close ,(mk-actor ma*))]
     [(match ,e ,ma* ...)
      (let ([a (fresh-anf-var)])
@@ -378,7 +379,6 @@
     [(,mf ,v* ...) (cons mf (map Value v*))]
     [,mf mf]
     [(>>= ,e0 (,av) ,e1) `(>>= ,(Expr e0) (lambda (,av) ,(Expr e1)))]
-    [(>> ,e0 ,e1) `(>> ,(Expr e0) ,(Expr e1))]
     [(var ,bv) `(lookupM ',bv)]
     [(close ,e) `(closeM ,(Expr e))]
     [(continue ,k ,v) `(continueM ',k ,(Value v))]
@@ -486,7 +486,6 @@
     [,null "{.t=NULL,.v=0}"])
   (Expr : Expr (e) -> * ()
     [(>>= ,e0 ,e1) (format "(stack_push(st,~A),~A)" (Expr e0) (Expr e1))]
-    [(>> ,e0 ,e1) (format "(~A,~A)" (Expr e0) (Expr e1))]
     [(point ,v) (Value v)]
     [(match ,v ,ma* ...) (format "match(~A)" (Value v))]
     [,mf (format "~A()" mf)]

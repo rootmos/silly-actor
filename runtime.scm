@@ -1,5 +1,5 @@
 (library (runtime)
-  (export >>= >> point
+  (export >>= point
           stateM msgM fromM selfM set-stateM
           lookupM matchM closeM
           becomeM spawnM sendM stopM
@@ -92,7 +92,6 @@
   (define (>>= ma f) (lambda (ctx env)
                        (let-values ([(x env_) (ma ctx env)])
                          ((f x) ctx env))))
-  (define (>> ma f) (>>= ma (lambda (_) f)))
   (define (point x) (lambda (ctx env) (values x env)))
 
   (define (match x p env)
