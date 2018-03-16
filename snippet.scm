@@ -16,14 +16,14 @@
     ;(pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 
-(define (show-Lstack code)
+(define (print-c code)
   (pretty-print
-    (unparse-Lstack
+    (output-c
       (to-stack
         (compile code)))))
 
 (define (test code expected)
-  (show-Lstack (code (current-output-port)))
+  (print-c (code (current-output-port)))
   (let ([str (call-with-string-output-port (lambda (p) (interp (code p))))])
     (with-input-from-string str (lambda ()
       (let ([actual (reverse (let go ([acc '()])
@@ -122,3 +122,6 @@
                 (output (call Id 7 [8 a]))
                 (output (call Id 9 [10 b]))))])))
   '((atom . a) (atom . b)))
+
+(pretty-print
+  (language->s-expression Lstack))

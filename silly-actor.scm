@@ -460,3 +460,46 @@
             [ctx^ (car acc)]
             [o*^ (map (lambda (o) (Options o ctx^)) o*)])
        `(system (,o*^ ...) ,ad*^ ...))]))
+
+(define (intercalate a xs)
+  (cond
+    [(null? xs) '()]
+    [(null? (cdr xs)) xs]
+    [else (cons (car xs) (cons a (intercalate a (cdr xs))))]))
+
+(define-pass output-c : Lstack (l) -> * ()
+  (definitions
+    (define atoms (make-eq-hashtable))
+    (define (internalize-atom a)
+      (or (hashtable-ref atoms a #f)
+          (begin
+            (let ([hash (symbol-hash a)])
+              (hashtable-set! atoms a hash)
+              hash)))))
+  (Value : Value (v) -> * ()
+    [(slot ,n) (format "stack_nth(st,~D)" n)]
+    [(sys ,s) (format "{.t=SYS,.v=~A}" (string-upcase (symbol->string s)))]
+    [(number ,n) (format "{.t=NUMBER,.v=~D}" n)]
+    [(atom ,a) (format "{.t=ATOM,.v=~D}" (internalize-atom a))]
+    [(cons ,v0 ,v1)
+     (format "{.t=CONS,.v=mk_cons(~A,~A)}" (Value v0) (Value v1))]
+    [,null "{.t=NULL,.v=0}"])
+  (Expr : Expr (e) -> * ()
+    [(>>= ,e0 ,e1) (format "(stack_push(st,~A),~A)" (Expr e0) (Expr e1))]
+    [(>> ,e0 ,e1) (format "(~A,~A)" (Expr e0) (Expr e1))]
+    [(point ,v) (Value v)]
+    [(match ,v ,ma* ...) (format "match(~A)" (Value v))]
+    [,mf (format "~A()" mf)]
+    [(,mf ,v* ...) (format "~A(~A)" mf
+                           (fold-left string-append ""
+                                      (intercalate "," (map Value v*))))]
+    [(continue ,n ,v) (format "continue(stack_nth(st,~D),~A)" n (Value v))]
+    [(with/cc ,e) (format "with_cc(~A)" (Expr e))]
+    [(close ,e) (format "close(~A)" (Expr e))]
+    )
+  (ActorDef : ActorDef (ad) -> * ()
+    [(define ,e) (format "stack_push(st,close(~A))" (Expr e))])
+  (System : System (s) -> * ()
+    [(system (,o* ...) ,ad* ...)
+     (fold-left string-append "" (intercalate ";" (map ActorDef ad*)))])
+  )
