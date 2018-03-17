@@ -17,7 +17,7 @@
     (eval code (environment '(scheme) '(runtime)))))
 
 (define (print-c code)
-  (pretty-print
+  (display
     (output-c
       (to-stack
         (compile code)))))
