@@ -471,7 +471,9 @@
   (definitions
     (define value-type "struct value")
     (define trampoline-type "struct trampoline")
-    (define yield "return yield();")
+    (define yield "return yield()")
+    (define (continue k v) (format "return continue(~A,~A)" k v))
+    (define (push v) (format "stack_push(st,~A)" v))
 
     (define var-counter 0)
     (define (fresh-var)
@@ -480,16 +482,16 @@
 
     (define cl-counter 0)
     (define cls '())
-    (define (close e)
+    (define (close k)
       (let* ([c cl-counter] [cl (format "cl_~s" c)] [v (fresh-var)])
         (set! cl-counter (+ c 1))
         (set! cls (cons
-                    (format "~A ~A() { void ~A ~A; ~A; ~A}"
+                    (format "~A ~A(struct stack st,~A ~A) {~A;~A;}"
                             trampoline-type
                             cl
                             value-type
                             v
-                            (Expr e v)
+                            (k v)
                             yield
                             )
                     cls))
@@ -511,23 +513,30 @@
     [(cons ,v0 ,v1)
      (format "{.t=CONS,.v=mk_cons(~A,~A)}" (Value v0) (Value v1))]
     [,null "{.t=NULL,.v=0}"])
-  (Expr : Expr (e o) -> * ()
-    [(>>= ,e0 ,e1)
-     (let ([v0 (fresh-var)])
-       (format "struct value ~A; ~A; stack_push(st,~A); ~A"
-               v0 (Expr e0 v0) v0 (Expr e1 o)))]
-    [(point ,v) (format "~A = ~A" o (Value v))]
-    [(match ,v ,ma* ...) (format "match(~A)" (Value v))]
-    [,mf (format "~A = ~A()" o mf)]
-    [(,mf ,v* ...) (format "~A = ~A(~A)" o mf
+  (Expr : Expr (e k) -> * ()
+    [(match ,v ,ma* ...) (k (format "match(~A)" (Value v)))]
+    [(point ,v) (k (Value v))]
+    [,mf (k (format "~A()" mf))]
+    [(close ,e) (k (close (lambda (v) (Expr e))))]
+    [(,mf ,v* ...) (k (format "~A(~A)" mf
                            (fold-left string-append ""
-                                      (intercalate "," (map Value v*))))]
-    [(continue ,n ,v) (format "continue(stack_nth(st,~D),~A)" n (Value v))]
-    [(with/cc ,e) (format "with_cc(~A)" (Expr e o))]
-    [(close ,e) (format "~A = ~A" o (close e))]
+                                      (intercalate "," (map Value v*)))))]
+
+    [(>>= ,e0 ,e1)
+     (k (Expr e0 (lambda (w)
+                (Expr e1 (lambda (v)
+                           (format "stack_push(st, ~A); ~A" w v))))))]
+
+    [(continue ,n ,v) (k (continue (format "stack_nth(st,~D)" n) (Value v)))]
+
+    [(with/cc ,e) (Expr e (lambda (v)
+                            (format "stack_push(st, ~A); ~A"
+                                    (close k) v)))]
     )
   (ActorDef : ActorDef (ad) -> * ()
-    [(define ,e) (format "stack_push(st,~A)" (close e))])
+    [(define ,e) (push
+                   (close (lambda (_)
+                          (Expr e (lambda (v) v)))))])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
      (let ([as (fold-left string-append ""

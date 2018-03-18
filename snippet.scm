@@ -123,5 +123,5 @@
                 (output (call Id 9 [10 b]))))])))
   '((atom . a) (atom . b)))
 
-(pretty-print
-  (language->s-expression Lstack))
+;(pretty-print
+  ;(language->s-expression Lstack))
