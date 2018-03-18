@@ -467,13 +467,29 @@
     [(null? (cdr xs)) xs]
     [else (cons (car xs) (cons a (intercalate a (cdr xs))))]))
 
+(define (mk-string sep ss) (fold-left string-append "" (intercalate sep ss)))
+
 (define-pass output-c : Lstack (l) -> * ()
   (definitions
     (define value-type "struct value")
     (define trampoline-type "struct trampoline")
     (define yield "return yield()")
+    (define match_error "return match_error()")
     (define (continue k v) (format "return continue(~A,~A)" k v))
     (define (push v) (format "stack_push(st,~A)" v))
+    (define (nth n) (format "stack_nth(st,~D)" n))
+    (define (car^ v) (format "car(~A)" v))
+    (define (cdr^ v) (format "cdr(~A)" v))
+    (define (is_cons v) (format "is_cons(~A)" v))
+    (define (eq^ v w) (format "eq(~A, ~A)" v w))
+    (define (mk_sys s) (format "{.t=SYS,.v=~A}"
+                               (string-upcase (symbol->string s))))
+    (define (mk_number n) (format "{.t=NUMBER,.v=~D}" n))
+    (define mk_null "{.t=NULL,.v=0}")
+    (define mk_true "true")
+    (define (mk_atom a) (format "{.t=ATOM,.v=~D}" (internalize-atom a)))
+    (define (mk_cons v0 v1)
+      (format "{.t=CONS,.v=mk_cons(~A,~A)}" v0 v1))
 
     (define var-counter 0)
     (define (fresh-var)
@@ -506,32 +522,56 @@
               hash))))
     )
   (Value : Value (v) -> * ()
-    [(slot ,n) (format "stack_nth(st,~D)" n)]
-    [(sys ,s) (format "{.t=SYS,.v=~A}" (string-upcase (symbol->string s)))]
-    [(number ,n) (format "{.t=NUMBER,.v=~D}" n)]
-    [(atom ,a) (format "{.t=ATOM,.v=~D}" (internalize-atom a))]
-    [(cons ,v0 ,v1)
-     (format "{.t=CONS,.v=mk_cons(~A,~A)}" (Value v0) (Value v1))]
-    [,null "{.t=NULL,.v=0}"])
+    [(slot ,n) (nth n)]
+    [(sys ,s) (mk_sys s)]
+    [(number ,n) (mk_number n)]
+    [(atom ,a) (mk_atom a)]
+    [(cons ,v0 ,v1) (mk_cons (Value v0) (Value v1))]
+    [,null mk_null])
+  (Pattern : Pattern (p v) -> * (bs)
+    [(cons ,p0 ,p1)
+     (let-values ([(cs0 bs0) (Pattern p0 (car^ v))]
+                  [(cs1 bs1) (Pattern p1 (cdr^ v))])
+       (values
+         (cons (is_cons v) (append cs1 cs0))
+         (append bs1 bs0)))]
+    [(bind) (values '() (list (push v)))]
+    [(slot ,n) (values (list (eq^ v (nth n))) '())]
+    [(sys ,s) (values (list (eq^ v (mk_sys s))) '())]
+    [(number ,n) (values (list (eq^ v (mk_number n))) '())]
+    [(atom ,a) (values (list (eq^ v (mk_atom a))) '())]
+    [,null (values (list (eq^ v mk_null)) '())]
+    [,wp (values (list mk_true) '())])
+  (MatchArm : MatchArm (ma v) -> * ()
+    [(,p ,e)
+     (let-values ([(cs bs) (Pattern p v)])
+       (format "if(~A) { ~A; ~A; } else"
+               (mk-string "&&" cs)
+               (mk-string ";" bs)
+               (continue (close (lambda (_) (Expr e (lambda (v) v)))) mk_null)))])
   (Expr : Expr (e k) -> * ()
-    [(match ,v ,ma* ...) (k (format "match(~A)" (Value v)))]
+    [(match ,v ,ma* ...)
+     (k (format
+          "~A { ~A }"
+          (mk-string " " (map (lambda (ma) (MatchArm ma (Value v))) ma*))
+          match_error))]
     [(point ,v) (k (Value v))]
     [,mf (k (format "~A()" mf))]
-    [(close ,e) (k (close (lambda (v) (Expr e))))]
+    [(close ,e) (k (close (lambda (v) (Expr e (lambda (v) v)))))]
     [(,mf ,v* ...) (k (format "~A(~A)" mf
                            (fold-left string-append ""
                                       (intercalate "," (map Value v*)))))]
 
     [(>>= ,e0 ,e1)
-     (k (Expr e0 (lambda (w)
+     (Expr e0 (lambda (w)
                 (Expr e1 (lambda (v)
-                           (format "stack_push(st, ~A); ~A" w v))))))]
+                           (k (format "~A; ~A" (push w) v))))))]
 
-    [(continue ,n ,v) (k (continue (format "stack_nth(st,~D)" n) (Value v)))]
+    [(continue ,n ,v) (continue (nth n) (Value v))]
 
     [(with/cc ,e) (Expr e (lambda (v)
-                            (format "stack_push(st, ~A); ~A"
-                                    (close k) v)))]
+                            (format "~A; ~A"
+                                    (push (close k)) v)))]
     )
   (ActorDef : ActorDef (ad) -> * ()
     [(define ,e) (push

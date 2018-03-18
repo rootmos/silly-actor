@@ -12,8 +12,8 @@
   (fold-left (lambda (x f) ((eval f) x)) x passes))
 
 (define (interp x)
+  (pretty-print x)
   (let ([code (output-scheme (compile x))])
-    ;(pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 
 (define (print-c code)
@@ -123,5 +123,5 @@
                 (output (call Id 9 [10 b]))))])))
   '((atom . a) (atom . b)))
 
-;(pretty-print
-  ;(language->s-expression Lstack))
+(pretty-print
+  (language->s-expression Lstack))
