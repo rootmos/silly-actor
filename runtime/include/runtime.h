@@ -1,6 +1,7 @@
 #pragma once
 
 #include <value.h>
+#include <stack.h>
 
 enum trampoline_action {
     CONTINUE = 0,
@@ -25,3 +26,7 @@ struct value becomeM(struct value cl);
 struct value spawnM(struct value cl, struct value state);
 struct value stateM();
 struct value selfM();
+
+typedef struct trampoline (*cl_t)(struct stack*, struct value);
+
+word_t mk_cl(cl_t, struct stack*);
