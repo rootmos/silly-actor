@@ -531,7 +531,7 @@
        (values
          (cons (is_cons v) (append cs1 cs0))
          (append bs1 bs0)))]
-    [(bind) (values '() (list (push v)))]
+    [(bind) (values (list mk_true) (list (push v)))]
     [(slot ,n) (values (list (eq^ v (nth n))) '())]
     [(sys ,s) (values (list (eq^ v (mk_sys s))) '())]
     [(number ,n) (values (list (eq^ v (mk_number n))) '())]
