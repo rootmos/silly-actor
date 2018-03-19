@@ -14,4 +14,9 @@ struct trampoline {
 };
 
 struct trampoline yield();
+#define yieldM() return yield()
 struct trampoline cont(struct value cl, struct value v);
+
+struct value fromM();
+struct value msgM();
+struct value sendM();

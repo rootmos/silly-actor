@@ -1,3 +1,4 @@
+#include <stack.h>
 #include <common.h>
 
 #include <stddef.h>
@@ -7,7 +8,7 @@
 #include <string.h>
 
 struct slot {
-    void* p;
+    struct stack_data data;
     uint16_t fork_count;
 };
 
@@ -42,7 +43,7 @@ struct stack* stack_fresh()
     return st;
 }
 
-void stack_push(struct stack* st, void* p)
+void stack_push(struct stack* st, struct stack_data data)
 {
     size_t sp0 = st->sp;
     size_t sp1 = st->sp += 1;
@@ -64,10 +65,10 @@ void stack_push(struct stack* st, void* p)
         st->fork = false;
         block->claimed = true;
         block->msp += 1;
-        block->slots[sp1].p = p;
+        block->slots[sp1].data = data;
     } else {
         block->msp += 1;
-        block->slots[sp1].p = p;
+        block->slots[sp1].data = data;
     }
 }
 
@@ -97,12 +98,12 @@ void stack_pop(struct stack* st)
     }
 }
 
-void* stack_nth(const struct stack* st, size_t n)
+struct stack_data stack_nth(const struct stack* st, size_t n)
 {
     if(n >= st->block->N)
         failwith("stack overflow (implement growing blocks)");
 
-    return st->block->slots[st->sp - n].p;
+    return st->block->slots[st->sp - n].data;
 }
 
 struct stack* stack_fork(const struct stack* st)
@@ -122,6 +123,13 @@ struct stack* stack_fork(const struct stack* st)
 
 test_suite(stack)
 
+bool cmp_data(struct stack_data d0, struct stack_data d1)
+{
+    return 0 == memcmp(&d0, &d1, sizeof(struct stack_data));
+}
+
+struct stack_data zero = {0};
+
 test_case(stack_fresh)
 {
     struct stack* st = stack_fresh();
@@ -132,7 +140,7 @@ test_case(stack_fresh)
     assert(st->block->N == STACK_NO_INITIAL_SLOTS);
     assert(st->block->msp == -1);
     for (size_t i = 0; i < st->block->N; i++) {
-        assert(st->block->slots[i].p == NULL);
+        assert(cmp_data(st->block->slots[i].data, zero));
         assert(st->block->slots[i].fork_count == 0);
     }
 }
@@ -141,38 +149,38 @@ test_case_end(stack_fresh);
 test_case(stack_push)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p0); stack_push(st, p0);
+    fresh(struct stack_data, p0); stack_push(st, p0);
     assert(st->sp == 0);
     assert(st->block->msp == 0);
-    assert(st->block->slots[0].p == p0);
+    assert(cmp_data(st->block->slots[0].data, p0));
 
-    fresh(void*, p1); stack_push(st, p1);
+    fresh(struct stack_data, p1); stack_push(st, p1);
     assert(st->sp == 1);
     assert(st->block->msp == 1);
-    assert(st->block->slots[1].p == p1);
+    assert(cmp_data(st->block->slots[1].data, p1));
 }
 test_case_end(stack_push);
 
 test_case(stack_nth)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p0); stack_push(st, p0);
-    assert(stack_nth(st, 0) == p0);
+    fresh(struct stack_data, p0); stack_push(st, p0);
+    assert(cmp_data(stack_nth(st, 0), p0));
 
-    fresh(void*, p1); stack_push(st, p1);
-    assert(stack_nth(st, 0) == p1);
-    assert(stack_nth(st, 1) == p0);
+    fresh(struct stack_data, p1); stack_push(st, p1);
+    assert(cmp_data(stack_nth(st, 0), p1));
+    assert(cmp_data(stack_nth(st, 1), p0));
 }
 test_case_end(stack_nth);
 
 test_case(stack_pop)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p0); stack_push(st, p0);
-    fresh(void*, p1); stack_push(st, p1);
+    fresh(struct stack_data, p0); stack_push(st, p0);
+    fresh(struct stack_data, p1); stack_push(st, p1);
 
     stack_pop(st);
-    assert(stack_nth(st, 0) == p0);
+    assert(cmp_data(stack_nth(st, 0), p0));
     assert(st->sp == 0);
     assert(st->block->msp == 0);
 
@@ -195,7 +203,7 @@ test_case(fork_empty_stack)
     assert(st->block->claimed);
     assert(st->block->msp == -1);
     for (size_t i = 0; i < st->block->N; i++) {
-        assert(st->block->slots[i].p == NULL);
+        assert(cmp_data(st->block->slots[i].data, zero));
         assert(st->block->slots[i].fork_count == 0);
     }
 
@@ -205,7 +213,7 @@ test_case(fork_empty_stack)
     assert(f->block->claimed);
     assert(f->block->msp == -1);
     for (size_t i = 0; i < f->block->N; i++) {
-        assert(f->block->slots[i].p == NULL);
+        assert(cmp_data(f->block->slots[i].data, zero));
         assert(f->block->slots[i].fork_count == 0);
     }
 }
@@ -214,7 +222,7 @@ test_case_end(fork_empty_stack)
 test_case(fork_non_empty_stack)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p0); stack_push(st, p0);
+    fresh(struct stack_data, p0); stack_push(st, p0);
     assert(st->block->slots[0].fork_count == 0);
 
     struct stack* f = stack_fork(st);
@@ -225,21 +233,21 @@ test_case(fork_non_empty_stack)
     assert(f->block == st->block);
     assert(f->block->claimed);
     assert(f->block->slots[0].fork_count == 1);
-    assert(stack_nth(st, 0) == p0);
-    assert(stack_nth(f, 0) == p0);
+    assert(cmp_data(stack_nth(st, 0), p0));
+    assert(cmp_data(stack_nth(f, 0), p0));
 }
 test_case_end(fork_non_empty_stack)
 
 test_case(push_fork_pop)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p0); stack_push(st, p0);
-    fresh(void*, p1); stack_push(st, p1);
+    fresh(struct stack_data, p0); stack_push(st, p0);
+    fresh(struct stack_data, p1); stack_push(st, p1);
 
     struct stack* f = stack_fork(st);
     stack_pop(st);
-    assert(stack_nth(f, 0) == p1);
-    assert(stack_nth(st, 0) == p0);
+    assert(cmp_data(stack_nth(f, 0), p1));
+    assert(cmp_data(stack_nth(st, 0), p0));
     assert(f->block->slots[0].fork_count == 1);
     assert(f->block->slots[1].fork_count == 1);
     assert(f->block->msp == 1);
@@ -252,13 +260,13 @@ test_case_end(push_fork_pop)
 test_case(push_fork_pop_fork)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p0); stack_push(st, p0);
-    fresh(void*, p1); stack_push(st, p1);
+    fresh(struct stack_data, p0); stack_push(st, p0);
+    fresh(struct stack_data, p1); stack_push(st, p1);
 
     struct stack* f = stack_fork(st);
     stack_pop(f);
-    assert(stack_nth(f, 0) == p0);
-    assert(stack_nth(st, 0) == p1);
+    assert(cmp_data(stack_nth(f, 0), p0));
+    assert(cmp_data(stack_nth(st, 0), p1));
     assert(f->block->slots[1].fork_count == 0);
     assert(f->block->slots[0].fork_count == 1);
     assert(f->block->msp == 1);
@@ -270,8 +278,8 @@ test_case_end(push_fork_pop_fork)
 test_case(push_fork_pop_pop_fork)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p0); stack_push(st, p0);
-    fresh(void*, p1); stack_push(st, p1);
+    fresh(struct stack_data, p0); stack_push(st, p0);
+    fresh(struct stack_data, p1); stack_push(st, p1);
 
     struct stack* f = stack_fork(st);
     stack_pop(st);
@@ -280,8 +288,8 @@ test_case(push_fork_pop_pop_fork)
     assert(f->block->msp == 1);
 
     stack_pop(f);
-    assert(stack_nth(f, 0) == p0);
-    assert(stack_nth(st, 0) == p0);
+    assert(cmp_data(stack_nth(f, 0), p0));
+    assert(cmp_data(stack_nth(st, 0), p0));
     assert(f->block->slots[0].fork_count == 2);
     assert(f->block->msp == 0);
     assert(st->fork);
@@ -292,8 +300,8 @@ test_case_end(push_fork_pop_pop_fork)
 test_case(push_fork_claim)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p0); stack_push(st, p0);
-    fresh(void*, p1); stack_push(st, p1);
+    fresh(struct stack_data, p0); stack_push(st, p0);
+    fresh(struct stack_data, p1); stack_push(st, p1);
 
     struct stack* f = stack_fork(st);
     stack_pop(st);
@@ -301,7 +309,7 @@ test_case(push_fork_claim)
     assert(f->fork);
     assert(st->fork);
 
-    fresh(void*, p2); stack_push(f, p2);
+    fresh(struct stack_data, p2); stack_push(f, p2);
     assert(st->block == f->block);
     assert(f->block->msp == 2);
     assert(f->block->slots[0].fork_count == 1);
@@ -316,21 +324,21 @@ test_case_end(push_fork_claim)
 test_case(push_fork_clone)
 {
     struct stack* st = stack_fresh();
-    fresh(void*, p0); stack_push(st, p0);
-    fresh(void*, p1); stack_push(st, p1);
+    fresh(struct stack_data, p0); stack_push(st, p0);
+    fresh(struct stack_data, p1); stack_push(st, p1);
 
     struct stack* f = stack_fork(st);
     assert(f->fork);
     assert(!st->fork);
     assert(f->block->slots[1].fork_count == 1);
 
-    fresh(void*, p2); stack_push(f, p2);
+    fresh(struct stack_data, p2); stack_push(f, p2);
     assert(st->block != f->block);
 
     assert(!f->fork);
-    assert(stack_nth(f, 0) == p2);
-    assert(stack_nth(f, 1) == p1);
-    assert(stack_nth(f, 2) == p0);
+    assert(cmp_data(stack_nth(f, 0), p2));
+    assert(cmp_data(stack_nth(f, 1), p1));
+    assert(cmp_data(stack_nth(f, 2), p0));
     assert(f->block->msp == 2);
     assert(f->block->claimed);
     assert(f->block->slots[0].fork_count == 0);
@@ -338,8 +346,8 @@ test_case(push_fork_clone)
     assert(f->block->slots[2].fork_count == 0);
 
     assert(!st->fork);
-    assert(stack_nth(st, 0) == p1);
-    assert(stack_nth(st, 1) == p0);
+    assert(cmp_data(stack_nth(st, 0), p1));
+    assert(cmp_data(stack_nth(st, 1), p0));
     assert(st->block->msp == 1);
     assert(st->block->claimed);
     assert(st->block->slots[0].fork_count == 0);

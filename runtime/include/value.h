@@ -1,9 +1,13 @@
 #pragma once
 
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+
 typedef uint64_t word_t;
 
 enum value_type {
-    NIL = NULL,
+    NIL = 0,
     NUMBER,
     ATOM,
     CL,
@@ -20,3 +24,6 @@ struct value {
 };
 
 word_t mk_cons(struct value v0, struct value v1);
+bool is_cons(struct value v);
+
+bool eq(struct value v0, struct value v1);
