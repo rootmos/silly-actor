@@ -27,3 +27,6 @@ word_t mk_cons(struct value v0, struct value v1);
 bool is_cons(struct value v);
 
 bool eq(struct value v0, struct value v1);
+
+struct value car(struct value c);
+struct value cdr(struct value c);
