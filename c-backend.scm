@@ -10,7 +10,7 @@
 
 (define (c-backend c-code opts)
   (let ([cmd
-          (format "~a -o ~a ~a -I~a -L~a -lruntime -x c -include preamble.c -"
+          (format "~a -o ~a ~a -I~a -L~a -x c -include preamble.c - -lruntime"
                   (c-env-cc opts)
                   (c-env-output opts)
                   (mk-string " " (c-env-flags opts))

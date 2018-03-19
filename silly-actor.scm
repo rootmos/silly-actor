@@ -477,17 +477,12 @@
     (define (cdr^ v) (format "cdr(~A)" v))
     (define (is_cons v) (format "is_cons(~A)" v))
     (define (eq^ v w) (format "eq(~A, ~A)" v w))
-    (define (mk_sys s) (format "(~a){.t=SYS,.v=~A}"
-                               value-type
-                               (string-upcase (symbol->string s))))
-    (define (mk_number n) (format "(~a){.t=NUMBER,.v=~D}" value-type n))
-    (define mk_null (format "(~a){.t=NIL,.v=0}" value-type))
+    (define (mk_sys s) (format "mk_sys(~A)" (string-upcase (symbol->string s))))
+    (define (mk_number n) (format "mk_number(~D)" n))
+    (define mk_null "mk_nil()")
     (define mk_true "true")
-    (define (mk_atom a) (format "(~a){.t=ATOM,.v=~D}"
-                                value-type
-                                (internalize-atom a)))
-    (define (mk_cons v0 v1)
-      (format "(~a){.t=CONS,.v=mk_cons(~A,~A)}" value-type v0 v1))
+    (define (mk_atom a) (format "mk_atom(~D)" (internalize-atom a)))
+    (define (mk_cons v0 v1) (format "mk_cons(~A,~A)" v0 v1))
 
     (define var-counter 0)
     (define (fresh-var)
@@ -512,7 +507,7 @@
                             yield
                             )
                     cls))
-        (format "(~a){.t=CL,.v=mk_cl(~A, stack_fork(st))}" value-type cl)))
+        (format "mk_cl(~A, stack_fork(st))" cl)))
 
     (define atoms (make-eq-hashtable))
     (define (internalize-atom a)

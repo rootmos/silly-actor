@@ -4,12 +4,15 @@ libruntime.a: runtime.o stack.o common.o
 
 test: stack_test
 
-stack_test: stack.o common.o tests.o
+stack_test: stack.test.o common.o tests.o
 	gcc -nostartfiles -o $@ -Wl,-e$@_suite $^
 	./$@
 
 %.o: %.c
-	gcc -DTEST -Iinclude -c $<
+	gcc -Iinclude -c $<
+
+%.test.o: %.c
+	gcc -DTEST -Iinclude -o $@ -c $<
 
 clean:
 	rm -f *.o *_test

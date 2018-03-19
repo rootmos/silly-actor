@@ -29,4 +29,4 @@ struct value selfM();
 
 typedef struct trampoline (*cl_t)(struct stack*, struct value);
 
-word_t mk_cl(cl_t, struct stack*);
+struct value mk_cl(cl_t, struct stack*);
