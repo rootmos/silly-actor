@@ -465,9 +465,10 @@
   (definitions
     (define value-type "struct value")
     (define trampoline-type "struct trampoline")
+    (define stack-decl "struct stack* st")
     (define yield "return yield()")
     (define match_error "return match_error()")
-    (define (continue k v) (format "return continue(~A,~A)" k v))
+    (define (continue k v) (format "return cont(~A,~A)" k v))
     (define (push v) (format "stack_push(st,~A)" v))
     (define (nth n) (format "stack_nth(st,~D)" n))
     (define (car^ v) (format "car(~A)" v))
@@ -494,9 +495,10 @@
       (let* ([c cl-counter] [cl (format "cl_~s" c)] [v (fresh-var)])
         (set! cl-counter (+ c 1))
         (set! cls (cons
-                    (format "~A ~A(struct stack st,~A ~A) {~A;~A;}"
+                    (format "~A ~A(~A,~A ~A) {~A;~A;}"
                             trampoline-type
                             cl
+                            stack-decl
                             value-type
                             v
                             (k v)
@@ -573,7 +575,8 @@
     [(system (,o* ...) ,ad* ...)
      (let ([as (fold-left string-append ""
                           (intercalate "; " (map ActorDef ad*)))])
-       (format "~A~nvoid run_system() { ~A }~n"
+       (format "~A~nvoid run_system(~A) { ~A }~n"
                (fold-left string-append "" (intercalate "\n" cls))
+               stack-decl
                as))])
   )

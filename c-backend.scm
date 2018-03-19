@@ -1,18 +1,22 @@
 (import (utils) (chezscheme) (posix))
-(define-record-type c-env (fields cc flags libdir output))
+(define-record-type c-env (fields cc flags includedir libdir output))
 
-(define gcc-c-env (make-c-env "gcc" (list "-g") "runtime" "a.out"))
+(define gcc-c-env (make-c-env "gcc" (list "-g")
+                              "runtime/include" "runtime"
+                              "a.out"))
 
 (define utf-8-transcoder
   (make-transcoder (utf-8-codec)))
 
 (define (c-backend c-code opts)
-  (let ([cmd (format "~a -o ~a ~a -L~a -lruntime -x c -"
-                     (c-env-cc opts)
-                     (c-env-output opts)
-                     (mk-string " " (c-env-flags opts))
-                     (c-env-libdir opts)
-                     )])
+  (let ([cmd
+          (format "~a -o ~a ~a -I~a -L~a -lruntime -x c -include preamble.c -"
+                  (c-env-cc opts)
+                  (c-env-output opts)
+                  (mk-string " " (c-env-flags opts))
+                  (c-env-includedir opts)
+                  (c-env-libdir opts)
+                  )])
     (log-info "execute: ~a" cmd)
     (log-debug "c code: <<<~n~a>>>" c-code)
     (apply
