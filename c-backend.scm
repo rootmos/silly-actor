@@ -18,7 +18,7 @@
                   (c-env-libdir opts)
                   )])
     (log-info "execute: ~a" cmd)
-    (log-debug "c code: <<<~n~a>>>" c-code)
+    (log-debug-lines "c-code" (line-numbers c-code))
     (apply
       (lambda (from-stdout to-stdin pid)
         (put-string to-stdin c-code)

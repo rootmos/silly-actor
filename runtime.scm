@@ -48,7 +48,7 @@
            [to (car m)] [from (cadr m)] [msg (caddr m)])
       (cond
         [(hashtable-ref (as-actors s) to #f) => (lambda (a)
-           (printf "delivering message:~s to:~s from:~s\n" msg to from)
+           ;(printf "delivering message:~s to:~s from:~s\n" msg to from)
            (call/cc (lambda (k)
                       ((cl-f (a-cl a)) (make-ctx a k from msg)
                                        (cl-env (a-cl a))))))]

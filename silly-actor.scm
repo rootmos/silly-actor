@@ -463,6 +463,8 @@
 
 (define-pass output-c : Lstack (l) -> * ()
   (definitions
+    (define (indent n)
+      (string-append "\n" (mk-string "" (map (lambda (_) "  ") (iota n)))))
     (define value-type "struct value")
     (define trampoline-type "struct trampoline")
     (define stack-decl "struct stack* st")
@@ -498,13 +500,15 @@
       (let* ([c cl-counter] [cl (format "cl_~s" c)] [v (fresh-var)])
         (set! cl-counter (+ c 1))
         (set! cls (cons
-                    (format "~A ~A(~A,~A ~A) {~A;~A;}"
+                    (format "~A ~A(~A,~A ~A) {~a~A;~a~A;~n}"
                             trampoline-type
                             cl
                             stack-decl
                             value-type
                             v
+                            (indent 1)
                             (k v)
+                            (indent 1)
                             yield
                             )
                     cls))
@@ -542,16 +546,22 @@
   (MatchArm : MatchArm (ma v) -> * ()
     [(,p ,e)
      (let-values ([(cs bs) (Pattern p v)])
-       (format "if(~A) { ~A; ~A; } else"
+       (format "if(~A) {~a~A;~a~A;~a} else"
                (mk-string "&&" cs)
+               (indent 2)
                (mk-string ";" bs)
-               (continue (close (lambda (_) (Expr e (lambda (v) v)))) mk_null)))])
+               (indent 2)
+               (continue (close (lambda (_) (Expr e (lambda (v) v)))) mk_null)
+               (indent 1)
+               ))])
   (Expr : Expr (e k) -> * ()
     [(match ,v ,ma* ...)
      (k (format
-          "~A { ~A; }"
+          "~A {~a~A;~a}"
           (mk-string " " (map (lambda (ma) (MatchArm ma (Value v))) ma*))
-          match_error))]
+          (indent 2)
+          match_error
+          (indent 1)))]
     [(point ,v) (k (Value v))]
     [,mf (k (format "~A()" mf))]
     [(close ,e) (k (close (lambda (v) (Expr e (lambda (v) v)))))]
@@ -562,13 +572,13 @@
     [(>>= ,e0 ,e1)
      (Expr e0 (lambda (w)
                 (Expr e1 (lambda (v)
-                           (k (format "~A; ~A" (push w) v))))))]
+                           (k (format "~A;~a~A" (push w) (indent 1) v))))))]
 
     [(continue ,n ,v) (continue (nth n) (Value v))]
 
     [(with/cc ,e) (Expr e (lambda (v)
-                            (format "~A; ~A"
-                                    (push (close k)) v)))]
+                            (format "~A;~a~A"
+                                    (push (close k)) (indent 1) v)))]
     )
   (ActorDef : ActorDef (ad) -> * ()
     [(define ,e) (push
@@ -577,9 +587,11 @@
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
      (let ([as (fold-left string-append ""
-                          (intercalate "; " (map ActorDef ad*)))])
-       (format "~A~nvoid run_system(~A) { ~A; }~n"
+                          (intercalate (string-append ";" (indent 1))
+                                       (map ActorDef ad*)))])
+       (format "~A~nvoid run_system(~A) {~a~A;~n}~n"
                (fold-left string-append "" (intercalate "\n" (reverse cls)))
                stack-decl
+               (indent 1)
                as))])
   )
