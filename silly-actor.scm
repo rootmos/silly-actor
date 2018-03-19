@@ -1,4 +1,4 @@
-(import (matchable) (nanopass))
+(import (matchable) (nanopass) (utils))
 
 (define (fun? x)
   (list? (member x '(stop spawn send become stay
@@ -461,14 +461,6 @@
             [o*^ (map (lambda (o) (Options o ctx^)) o*)])
        `(system (,o*^ ...) ,ad*^ ...))]))
 
-(define (intercalate a xs)
-  (cond
-    [(null? xs) '()]
-    [(null? (cdr xs)) xs]
-    [else (cons (car xs) (cons a (intercalate a (cdr xs))))]))
-
-(define (mk-string sep ss) (fold-left string-append "" (intercalate sep ss)))
-
 (define-pass output-c : Lstack (l) -> * ()
   (definitions
     (define value-type "struct value")
@@ -552,7 +544,7 @@
   (Expr : Expr (e k) -> * ()
     [(match ,v ,ma* ...)
      (k (format
-          "~A { ~A }"
+          "~A { ~A; }"
           (mk-string " " (map (lambda (ma) (MatchArm ma (Value v))) ma*))
           match_error))]
     [(point ,v) (k (Value v))]

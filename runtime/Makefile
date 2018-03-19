@@ -1,3 +1,7 @@
+
+libruntime.a: runtime.o stack.o common.o
+	ar cr $@ $^
+
 test: stack_test
 
 stack_test: stack.o common.o tests.o

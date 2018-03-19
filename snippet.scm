@@ -1,5 +1,5 @@
 (load "silly-actor.scm")
-
+(load "c-backend.scm")
 
 (define passes '(parse-Lsrc
                  list-to-cons+nil
@@ -17,10 +17,8 @@
     (eval code (environment '(scheme) '(runtime)))))
 
 (define (print-c code)
-  (display
-    (output-c
-      (to-stack
-        (compile code)))))
+  (let ([c-code (output-c (to-stack (compile code)))])
+    (c-backend c-code gcc-c-env)))
 
 (define (test code expected)
   (print-c (code (current-output-port)))
