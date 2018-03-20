@@ -46,8 +46,7 @@
     (number (n))
     (wildcard-pattern (wp))
     (fun (f))
-    (bound-var (bv))
-    (output-port (op)))
+    (bound-var (bv)))
   (entry System)
   (Pattern (p)
     a
@@ -79,8 +78,7 @@
   (MatchArm (ma) (p e))
   (ActorDef (ad) (define (bv) ma* ...))
   (Options (o)
-    (init bv v)
-    (output-port op))
+    (init bv v))
   (System (t) (system (o* ...) ad* ...)))
 
 (define-parser parse-Lsrc Lsrc)
@@ -371,7 +369,7 @@
     [(atom ,a) `'(atom . ,a)]
     [(sys ,s) `',s]
     [(anf-val ,av) av]
-    [(number ,n) `'(number . ,n)]
+    [(number ,n) `(cons 'number ,n)]
     [,null ''()]
     [(cons ,v0 ,v1) `(list 'cons ,(Value v0) ,(Value v1))])
   (Expr : Expr (e) -> * ()
@@ -390,12 +388,11 @@
   (ActorDef : ActorDef (ad) -> * ()
     [(define (,bv) ,e) `(cons ',bv ,(Expr e))])
   (Options : Options (o) -> * ()
-    [(init ,bv ,v) `(init ,bv ,(Value v))]
-    [(output-port ,op) `(output-port ,op)])
+    [(init ,bv ,v) `(list 'init ',bv ,(Value v))])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
      `(run-system
-        ',(map Options o*)
+        ,(cons 'list (map Options o*))
         ,(cons 'list  (map ActorDef ad*)))]))
 
 (define-language
@@ -587,8 +584,7 @@
                    (close (lambda (_)
                           (Expr e (lambda (v) v)))))])
   (Options : Options (o) -> * ()
-    [(init ,n ,v) (format "spawnM(~a,~a)" (nth n) (Value v))]
-    [(output-port ,op) ""])
+    [(init ,n ,v) (format "spawnM(~a,~a)" (nth n) (Value v))])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
      (let ([as (fold-left string-append ""

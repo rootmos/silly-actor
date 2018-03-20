@@ -57,7 +57,7 @@ struct value cdr(struct value c)
 void pretty_print(int fd, struct value v)
 {
     switch (v.t) {
-    case NIL: dprintf(fd, "'()"); break;
+    case NIL: dprintf(fd, "()"); break;
     case NUMBER: dprintf(fd, "(number . %d)", v.v); break;
     case ATOM: not_implemented();
     case CL: dprintf(fd, "<closure>"); break;

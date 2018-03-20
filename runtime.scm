@@ -151,44 +151,40 @@
         (yieldM ctx env))))
 
   (define (run-system os root-defs)
-    (let* ([root-env (fold-left (lambda (env d)
-                                  (cons (cons (car d) (make-cl (cdr d) env))
-                                        env))
-                                '()
-                                root-defs)]
-           [s (make-as (empty-queue) (make-eqv-hashtable) (box 0) root-env)]
-           [root (make-a 'Root
-                         'Root
-                         (make-cl (lambda (ctx env) (void)) root-env)
-                         '()
-                         s)]
-           [sys-actor (lambda (id f)
-                        (hashtable-set!
-                          (as-actors s) id
-                          (make-a id 'Root (make-cl f root-env) '() s)))]
-           [output-port (current-output-port)])
-      (hashtable-set! (as-actors s) 'Root root)
+    (lambda (op)
+      (let* ([root-env (fold-left (lambda (env d)
+                                    (cons (cons (car d) (make-cl (cdr d) env))
+                                          env))
+                                  '()
+                                  root-defs)]
+             [s (make-as (empty-queue) (make-eqv-hashtable) (box 0) root-env)]
+             [root (make-a 'Root
+                           'Root
+                           (make-cl (lambda (ctx env) (void)) root-env)
+                           '()
+                           s)]
+             [sys-actor (lambda (id f)
+                          (hashtable-set!
+                            (as-actors s) id
+                            (make-a id 'Root (make-cl f root-env) '() s)))])
+        (hashtable-set! (as-actors s) 'Root root)
 
-      (sys-actor 'Output
-                 (lambda (ctx env)
-                   (write (ctx-msg ctx) output-port)))
+        (sys-actor 'Output (lambda (ctx env) (write (ctx-msg ctx) op)))
 
-      (for-each (lambda (o)
-                  (cond
-                    [(and (eqv? (car o) 'init))
-                     (let ([a (cadr o)] [v (caddr o)])
-                       (spawn-actor
-                         (hashtable-ref (as-actors s) 'Root #f)
-                         (lookup a root-env)
-                         v))]
-                    [(and (eqv? (car o) 'output-port))
-                     (set! output-port (cadr o))]
-                    [else (void)])) os)
-      (call/cc (lambda (k)
-                 (let go ()
-                   (if (queue-empty? (as-inbox s)) (k)
-                     (begin
-                       (deliver-message s)
-                       (go))))))
-      (printf "actor system stopped\n")))
+        (for-each (lambda (o)
+                    (cond
+                      [(and (eqv? (car o) 'init))
+                       (let ([a (cadr o)] [v (caddr o)])
+                         (spawn-actor
+                           (hashtable-ref (as-actors s) 'Root #f)
+                           (lookup a root-env)
+                           v))]
+                      [else (void)])) os)
+        (call/cc (lambda (k)
+                   (let go ()
+                     (if (queue-empty? (as-inbox s)) (k)
+                       (begin
+                         (deliver-message s)
+                         (go))))))
+        )))
   )
