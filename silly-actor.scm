@@ -586,14 +586,20 @@
     [(define ,e) (push
                    (close (lambda (_)
                           (Expr e (lambda (v) v)))))])
+  (Options : Options (o) -> * ()
+    [(init ,n ,v) (format "spawnM(~a,~a)" (nth n) (Value v))]
+    [(output-port ,op) ""])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
      (let ([as (fold-left string-append ""
                           (intercalate (string-append ";" (indent 1))
                                        (map ActorDef ad*)))])
-       (format "~A~nvoid setup_system(~A) {~a~A;~n}~n"
-               (fold-left string-append "" (intercalate "\n" (reverse cls)))
+       (format "~A~nvoid setup_system(~A) {~a~A;~a~A;~n}~n"
+               (mk-string "\n" (reverse cls))
                stack-decl
                (indent 1)
-               as))])
+               as
+               (indent 1)
+               (mk-string (string-append ";" (indent 1)) (map Options o*))
+               ))])
   )

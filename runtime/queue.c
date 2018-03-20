@@ -1,15 +1,11 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <common.h>
 #include <queue.h>
 
-struct queue_node {
-    void* p;
-    struct queue_node* next;
-};
-
 struct queue {
-    struct queue_node* head;
-    struct queue_node* tail;
+    struct msg* head;
+    struct msg* tail;
 };
 
 struct queue* fresh_queue()
@@ -17,12 +13,25 @@ struct queue* fresh_queue()
     return calloc(sizeof(struct queue), 1);
 }
 
-void enqueue(struct queue* q, void* m)
+void enqueue(struct queue* q, struct msg* m)
 {
-    not_implemented();
+    assert(m->next == NULL);
+
+    if(q->head == NULL) {
+        assert(q->head == NULL);
+        q->head = q->tail = m;
+    } else {
+        assert(q->tail->next == NULL);
+        q->tail->next = m;
+        q->tail = m;
+    }
 }
 
-bool dequeue(struct queue* q, void** m)
+bool dequeue(struct queue* q, struct msg** m)
 {
-    not_implemented();
+    if (q->head == NULL) return false;
+
+    *m = q->head;
+    q->head = (*m)->next;
+    return true;
 }

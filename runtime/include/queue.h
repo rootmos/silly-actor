@@ -5,5 +5,5 @@
 struct queue;
 
 struct queue* fresh_queue();
-void enqueue(struct queue*, void*);
-bool dequeue(struct queue*, void**);
+void enqueue(struct queue*, struct msg*);
+bool dequeue(struct queue*, struct msg**);

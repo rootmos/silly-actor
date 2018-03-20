@@ -32,19 +32,28 @@ struct value set_clM(struct value cl);
 
 typedef struct trampoline (*cl_t)(struct stack*, struct value);
 
-struct value mk_cl(cl_t, struct stack*);
-
 
 typedef uint64_t actor_id;
 
 struct msg {
-    actor_id aid;
+    actor_id to;
+    actor_id from;
     struct value v;
+    struct msg* next;
 };
+
+struct closure {
+    cl_t f;
+    struct stack* st;
+};
+
+struct value mk_cl(cl_t, struct stack*);
+struct closure* cast_cl(struct value);
 
 struct actor {
     actor_id aid;
-    cl_t cl;
+    struct closure* cl;
     struct value state;
     actor_id parent;
+    struct actor* next;
 };

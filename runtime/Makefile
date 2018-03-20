@@ -1,4 +1,4 @@
-CC_OPTS=-Wpedantic -Werror
+CC_OPTS=-Wpedantic -Werror -g
 
 libruntime.a: runtime.o stack.o common.o value.o queue.o
 	ar cr $@ $^

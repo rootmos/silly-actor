@@ -26,15 +26,15 @@
         (put-string to-stdin c-code)
         (flush-output-port to-stdin)
         (close-output-port to-stdin)
-      (let ([o (let go ([acc ""])
-                 (let ([l (get-line from-stdout)])
-                   (cond
-                     [(eof-object? l) acc]
-                     [else (go (string-append acc l "\n" ))])))]
-            [ec (wait-for-pid pid)])
-        (log-info "c compiler exited with code: ~D" ec)
-        (log-debug "c compiler output: <<<~n~a>>>" o)
-        (eq? ec 0)
-        ))
+        (let ([o (let go ([acc ""])
+                   (let ([l (get-line from-stdout)])
+                     (cond
+                       [(eof-object? l) acc]
+                       [else (go (string-append acc l "\n" ))])))]
+              [ec (wait-for-pid pid)])
+          (log-info "c compiler exited with code: ~D" ec)
+          (log-debug "c compiler output: <<<~n~a>>>" o)
+          (eq? ec 0)
+          ))
       (process (string-append "exec " cmd " 2>&1"))))
   )

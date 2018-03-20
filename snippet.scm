@@ -16,23 +16,32 @@
   (let ([code (output-scheme (compile x))])
     (eval code (environment '(scheme) '(runtime)))))
 
+(define utf-8-transcoder
+  (make-transcoder (utf-8-codec)))
+
 (define (run-c code)
   (let ([c-code (output-c (to-stack (compile code)))])
     (assert (c-backend c-code gcc-a-out))
-    (assert (eq? (system "./a.out") 0))
-    ))
+    (let-values ([(to-stdin from-stdout from-stderr pid)
+                  (open-process-ports "./a.out" 'line utf-8-transcoder)])
+      (reverse (let go ([acc '()])
+                 (let ([o (read from-stdout)])
+                   (cond
+                     [(eof-object? o) acc]
+                     [else (go (cons o acc))])))))))
 
 (define (test code expected)
-  (run-c (code (current-output-port)))
   (let ([str (call-with-string-output-port (lambda (p) (interp (code p))))])
     (with-input-from-string str (lambda ()
-      (let ([actual (reverse (let go ([acc '()])
-                               (let ([o (read)])
-                                 (cond
-                                   [(eqv? o (eof-object)) acc]
-                                   [else (go (cons o acc))]))))])
-        (printf "actual:~s expected:~s\n" actual expected)
-        (assert (equal? actual expected)))))))
+      (let ([a (reverse (let go ([acc '()])
+                          (let ([o (read)])
+                            (cond
+                              [(eof-object? o) acc]
+                              [else (go (cons o acc))]))))]
+            [ac (run-c (code (current-output-port)))])
+        (printf "actual:~s actual-c:~s expected:~s\n" a ac expected)
+        (assert (equal? a expected))
+        (assert (equal? ac expected)))))))
 
 (test
   (lambda (p)
@@ -53,7 +62,7 @@
     `(system
        [(init Main 7) (output-port ,p)]
        (define (Main) [_ (output (state))])))
-  '('(number . 7)))
+  '((number . 7)))
 
 (test
   (lambda (p)

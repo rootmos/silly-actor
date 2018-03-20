@@ -12,14 +12,18 @@ enum value_type {
     ATOM,
     CL,
     SYS,
-    ACTOR_ID
+    ACTOR_ID,
+    CONS
 };
 
 enum sys_atom {
-    OUTPUT=1,
+    ROOT=0,
+    OUTPUT,
     INIT,
     SYS_ATOMS_END
 };
+
+#define sys_actor(s) (s == OUTPUT)
 
 struct value {
     enum value_type t;
@@ -31,6 +35,7 @@ struct value mk_cons(struct value v0, struct value v1);
 #define mk_number(n) ((struct value){.t=NUMBER,.v=n})
 #define mk_sys(s) ((struct value){.t=SYS,.v=s})
 #define mk_nil() ((struct value){.t=NIL,.v=0})
+#define mk_aid(aid) ((struct value){.t=ACTOR_ID,.v=aid})
 
 bool is_cons(struct value v);
 
@@ -38,3 +43,5 @@ bool eq(struct value v0, struct value v1);
 
 struct value car(struct value c);
 struct value cdr(struct value c);
+
+void pretty_print(int fd, struct value);
