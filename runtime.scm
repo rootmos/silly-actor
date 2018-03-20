@@ -1,8 +1,8 @@
 (library (runtime)
   (export >>= point
-          stateM msgM fromM selfM set-stateM
+          stateM msgM fromM selfM set-stateM set-clM
           lookupM matchM closeM
-          becomeM spawnM sendM stopM
+          spawnM sendM stopM
           with/ccM continueM yieldM
           run-system)
   (import (chezscheme))
@@ -126,9 +126,9 @@
 
   (define yieldM (lambda (ctx env) ((ctx-k ctx))))
 
-  (define (becomeM cl)
+  (define (set-clM cl)
     (lambda (ctx env)
-      (begin (a-cl-set! (ctx-a ctx) cl) (yieldM ctx env))))
+      (begin (a-cl-set! (ctx-a ctx) cl) (values '() env))))
 
   (define (set-stateM st)
     (lambda (ctx env)

@@ -158,8 +158,8 @@
   )
 
 (define (primfun? x)
-  (list? (member x '(stop spawn send become from msg parent state
-                          self set-state! yield))))
+  (list? (member x '(stop spawn send from msg parent state
+                          self set-state! set-cl! yield))))
 
 (define (cont? x)
   (and
@@ -195,7 +195,7 @@
      (case f
        ['become
         (let ([b (car e*)] [s (cadr e*)])
-          `(seq (set-state! ,(Expr s)) (become ,(Expr b))))]
+          `(seq (set-state! ,(Expr s)) (set-cl! ,(Expr b)) (yield)))]
        ['stay `(seq (set-state! ,(Expr (car e*))) (yield))]
        ['output `(send (value (sys Output)) ,(map Expr e*) ...)]
        ['reply `(seq (send (from) ,(map Expr e*) ...) (yield))]
@@ -233,21 +233,23 @@
     [(recv ,ma* ...)
      (let ([k (fresh-cont)])
        `(with/cc (,k)
-          (become
-            (actor [_ (continue ,k (match (msg) ,(map MatchArm ma*) ...))])
-            )))]))
+          (seq
+            (set-cl! (actor
+                       [_ (continue ,k
+                            (match (msg) ,(map MatchArm ma*) ...))]))
+            (yield))))]))
 
 (define primfun-to-monadfun
   '((stop 0 stopM)
     (spawn 2 spawnM)
     (send 2 sendM)
-    (become 1 becomeM)
     (from 0 fromM)
     (msg 0 msgM)
     (parent 0 parentM)
     (state 0 stateM)
     (self 0 selfM)
     (set-state! 1 set-stateM)
+    (set-cl! 1 set-clM)
     (yield 0 yieldM)
     ))
 
@@ -564,10 +566,12 @@
         ['yieldM yield]
         [else (k (format "~A()" mf))])]
     [(close ,e) (k (close (lambda (v) (Expr e (lambda (v) v)))))]
-    [(,mf ,v* ...) (k (format "~A(~A)" mf
-                           (fold-left string-append ""
-                                      (intercalate "," (map Value v*)))))]
-
+    [(,mf ,v* ...)
+     (k (format "~A(~A)" (case mf
+                           ['set-stateM 'set_stateM]
+                           ['set-clM 'set_clM]
+                           [else mf])
+                (mk-string "," (map Value v*))))]
     [(>>= ,e0 ,e1)
      (Expr e0
        (lambda (w) (format "~A;~a~A" (push w) (indent 1) (Expr e1 k))))]

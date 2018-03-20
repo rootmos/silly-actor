@@ -21,10 +21,11 @@ struct trampoline match_error();
 struct value fromM();
 struct value msgM();
 struct value sendM(struct value to, struct value msg);
-struct value becomeM(struct value cl);
 struct value spawnM(struct value cl, struct value state);
 struct value stateM();
 struct value selfM();
+struct value set_stateM(struct value state);
+struct value set_clM(struct value cl);
 
 typedef struct trampoline (*cl_t)(struct stack*, struct value);
 
