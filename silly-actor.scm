@@ -538,7 +538,7 @@
     [(atom ,a) (values (list (eq^ v (mk_atom a))) '())]
     [,null (values (list (eq^ v mk_null)) '())]
     [,wp (values (list mk_true) '())])
-  (MatchArm : MatchArm (ma v) -> * ()
+  (MatchArm : MatchArm (ma v cl) -> * ()
     [(,p ,e)
      (let-values ([(cs bs) (Pattern p v)])
        (format "if(~A) {~a~A;~a~A;~a} else"
@@ -546,28 +546,31 @@
                (indent 2)
                (mk-string ";" bs)
                (indent 2)
-               (continue (close (lambda (_) (Expr e (lambda (v) v)))) mk_null)
+               (Expr e (lambda (v) (continue cl v)))
                (indent 1)
                ))])
   (Expr : Expr (e k) -> * ()
     [(match ,v ,ma* ...)
-     (k (format
-          "~A {~a~A;~a}"
-          (mk-string " " (map (lambda (ma) (MatchArm ma (Value v))) ma*))
-          (indent 2)
-          match_error
-          (indent 1)))]
+     (let ([cl (close k)])
+       (format
+         "~A {~a~A;~a}"
+         (mk-string " " (map (lambda (ma) (MatchArm ma (Value v) cl)) ma*))
+         (indent 2)
+         match_error
+         (indent 1)))]
     [(point ,v) (k (Value v))]
-    [,mf (k (format "~A()" mf))]
+    [,mf
+      (case mf
+        ['yieldM yield]
+        [else (k (format "~A()" mf))])]
     [(close ,e) (k (close (lambda (v) (Expr e (lambda (v) v)))))]
     [(,mf ,v* ...) (k (format "~A(~A)" mf
                            (fold-left string-append ""
                                       (intercalate "," (map Value v*)))))]
 
     [(>>= ,e0 ,e1)
-     (Expr e0 (lambda (w)
-                (Expr e1 (lambda (v)
-                           (k (format "~A;~a~A" (push w) (indent 1) v))))))]
+     (Expr e0
+       (lambda (w) (format "~A;~a~A" (push w) (indent 1) (Expr e1 k))))]
 
     [(continue ,n ,v) (continue (nth n) (Value v))]
 

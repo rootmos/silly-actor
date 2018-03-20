@@ -11,4 +11,8 @@ scheme:
 $(RUNTIME):
 	make -C runtime ${notdir $@}
 
-.PHONY: snippet scheme
+clean:
+	rm -f *.so
+	make -C runtime clean
+
+.PHONY: snippet scheme clean
