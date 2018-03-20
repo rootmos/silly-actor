@@ -591,7 +591,7 @@
      (let ([as (fold-left string-append ""
                           (intercalate (string-append ";" (indent 1))
                                        (map ActorDef ad*)))])
-       (format "~A~nvoid run_system(~A) {~a~A;~n}~n"
+       (format "~A~nvoid setup_system(~A) {~a~A;~n}~n"
                (fold-left string-append "" (intercalate "\n" (reverse cls)))
                stack-decl
                (indent 1)

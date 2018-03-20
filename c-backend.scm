@@ -1,9 +1,11 @@
 (import (utils) (chezscheme) (posix))
 (define-record-type c-env (fields cc flags includedir libdir output))
 
-(define gcc-c-env (make-c-env "gcc" (list "-g")
-                              "runtime/include" "runtime"
-                              "a.out"))
+(define (gcc-with-output o) (make-c-env "gcc" (list "-g")
+                                     "runtime/include" "runtime"
+                                     o))
+
+(define gcc-a-out (gcc-with-output "a.out"))
 
 (define utf-8-transcoder
   (make-transcoder (utf-8-codec)))

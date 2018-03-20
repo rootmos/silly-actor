@@ -16,12 +16,14 @@
   (let ([code (output-scheme (compile x))])
     (eval code (environment '(scheme) '(runtime)))))
 
-(define (print-c code)
+(define (run-c code)
   (let ([c-code (output-c (to-stack (compile code)))])
-    (c-backend c-code gcc-c-env)))
+    (assert (c-backend c-code gcc-a-out))
+    (assert (eq? (system "./a.out") 0))
+    ))
 
 (define (test code expected)
-  (print-c (code (current-output-port)))
+  (run-c (code (current-output-port)))
   (let ([str (call-with-string-output-port (lambda (p) (interp (code p))))])
     (with-input-from-string str (lambda ()
       (let ([actual (reverse (let go ([acc '()])

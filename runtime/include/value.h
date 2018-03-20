@@ -11,12 +11,14 @@ enum value_type {
     NUMBER,
     ATOM,
     CL,
-    SYS
+    SYS,
+    ACTOR_ID
 };
 
 enum sys_atom {
     OUTPUT=1,
-    INIT
+    INIT,
+    SYS_ATOMS_END
 };
 
 struct value {

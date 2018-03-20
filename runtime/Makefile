@@ -1,18 +1,19 @@
+CC_OPTS=-Wpedantic -Werror
 
-libruntime.a: runtime.o stack.o common.o
+libruntime.a: runtime.o stack.o common.o value.o queue.o
 	ar cr $@ $^
 
 test: stack_test
 
 stack_test: stack.test.o common.o tests.o
-	gcc -nostartfiles -o $@ -Wl,-e$@_suite $^
+	gcc $(CC_OPTS) -nostartfiles -o $@ -Wl,-e$@_suite $^
 	./$@
 
 %.o: %.c
-	gcc -Iinclude -c $<
+	gcc $(CC_OPTS) -Iinclude -c $<
 
 %.test.o: %.c
-	gcc -DTEST -Iinclude -o $@ -c $<
+	gcc $(CC_OPTS) -DTEST -Iinclude -o $@ -c $<
 
 clean:
 	rm -f *.o *_test
