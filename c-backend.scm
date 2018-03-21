@@ -1,9 +1,8 @@
 (import (utils) (chezscheme) (posix))
 (define-record-type c-env (fields cc flags includedir libdir output))
 
-(define (gcc-with-output o) (make-c-env "gcc" (list "-g")
-                                     "runtime/include" "runtime"
-                                     o))
+(define (gcc-with-output o)
+  (make-c-env "gcc" (list "-g") "runtime/include" "runtime" o))
 
 (define gcc-a-out (gcc-with-output "a.out"))
 
@@ -19,8 +18,8 @@
                   (c-env-includedir opts)
                   (c-env-libdir opts)
                   )])
-    (log-info "execute: ~a" cmd)
-    (log-debug-lines "c-code" (line-numbers c-code))
+    (log-debug "execute: ~a" cmd)
+    (log-trace-lines "c-code" (line-numbers c-code))
     (apply
       (lambda (from-stdout to-stdin pid)
         (put-string to-stdin c-code)
@@ -32,7 +31,7 @@
                        [(eof-object? l) acc]
                        [else (go (string-append acc l "\n" ))])))]
               [ec (wait-for-pid pid)])
-          (log-info "c compiler exited with code: ~D" ec)
+          (log-debug "c compiler exited with code: ~D" ec)
           (log-debug "c compiler output: <<<~n~a>>>" o)
           (eq? ec 0)
           ))

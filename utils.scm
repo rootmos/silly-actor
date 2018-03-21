@@ -2,7 +2,7 @@
   (utils)
   (export intercalate mk-string line-numbers
           index
-          log-info log-debug log-debug-lines)
+          log-warn log-info log-debug log-trace-lines)
   (import (scheme) (thunder-utils))
 
   (define (index a b)
@@ -26,18 +26,26 @@
 
   (define metadata-port (console-error-port))
 
-  (define (log-info fmt . args)
-    (display-string
-      (eval `(format (string-append "INFO: " ,fmt "~n") . ,args))
-      metadata-port))
+  (define log-level
+    (cond
+      [(equal? (getenv "TRACE") "1") 4]
+      [(equal? (getenv "DEBUG") "1") 3]
+      [(equal? (getenv "INFO") "1") 2]
+      [(equal? (getenv "WARN") "1") 1]
+      [else 0]))
 
-  (define (log-debug fmt . args)
-    (display-string
-      (eval `(format (string-append "DEBUG: " ,fmt "~n") . ,args))
-      metadata-port))
+  (define (log-raw tag l fmt args)
+    (when (>= log-level l)
+      (display-string
+        (apply format (cons (string-append tag ": " fmt "~n") args))
+        metadata-port)))
 
-  (define (log-debug-lines prefix ls)
-    (for-each
-      (lambda (l) (display-string (string-append "DEBUG: " prefix " " l "\n") metadata-port))
-      ls))
+  (define (log-warn fmt . args) (log-raw "WARN" 1 fmt args))
+  (define (log-info fmt . args) (log-raw "INFO" 2 fmt args))
+  (define (log-debug fmt . args) (log-raw "DEBUG" 3 fmt args))
+  (define (log-trace fmt . args) (log-raw "TRACE" 4 fmt args))
+
+  (define (log-trace-lines prefix ls)
+    (when (>= log-level 4)
+      (for-each (lambda (l) (log-debug (string-append prefix " " l))) ls)))
   )

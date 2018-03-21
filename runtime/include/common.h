@@ -12,21 +12,30 @@ void __failwith(const char* caller,
                 const char* fmt, ...)
     __attribute__ ((noreturn));
 
-#define info(...) do {                                          \
-    fprintf(stderr, "%s:%s:%d: ", __extension__ __FUNCTION__,  __extension__ __FILE__, __extension__ __LINE__);         \
-    fprintf(stderr, __VA_ARGS__);                               \
-    fprintf(stderr, "\n");                                      \
+#define log(l, ...) do {                                          \
+    if(log_level >= l) { \
+        fprintf(stderr, "%s:%s:%d: ", \
+                __extension__ __FUNCTION__, \
+                __extension__ __FILE__, \
+                __extension__ __LINE__); \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, "\n"); \
+    } \
 } while (0)
 
-#define warn(...) do {                                          \
-    fprintf(stderr, "%s:%d: ",                                  \
-            __extension__ __FUNCTION__,__extension__ __LINE__); \
-    fprintf(stderr, __VA_ARGS__);                               \
-    fprintf(stderr, "\n");                                      \
-} while (0)
+#define warn(...) log(WARN, __VA_ARGS__)
+#define info(...) log(INFO, __VA_ARGS__)
+#define debug(...) log(DEBUG, __VA_ARGS__)
+#define trace(...) log(TRACE, __VA_ARGS__)
 
-#define debug(...) do {                                          \
-    fprintf(stderr, "%s:%s:%d: ", __extension__ __FUNCTION__,  __extension__ __FILE__, __extension__ __LINE__);         \
-    fprintf(stderr, __VA_ARGS__);                               \
-    fprintf(stderr, "\n");                                      \
-} while (0)
+enum log_level {
+    STDERR=0,
+    WARN,
+    INFO,
+    DEBUG,
+    TRACE
+};
+
+enum log_level log_level;
+
+void set_log_level();

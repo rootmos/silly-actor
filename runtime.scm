@@ -5,7 +5,7 @@
           spawnM sendM stopM
           with/ccM continueM yieldM
           run-system)
-  (import (chezscheme))
+  (import (chezscheme) (utils))
 
   (define-record-type as (fields inbox actors actor-counter root-env))
   (define-record-type cl (fields f env))
@@ -48,11 +48,11 @@
            [to (car m)] [from (cadr m)] [msg (caddr m)])
       (cond
         [(hashtable-ref (as-actors s) to #f) => (lambda (a)
-           ;(printf "delivering message:~s to:~s from:~s\n" msg to from)
+           (log-debug "delivering message:~s to:~s from:~s" msg to from)
            (call/cc (lambda (k)
                       ((cl-f (a-cl a)) (make-ctx a k from msg)
                                        (cl-env (a-cl a))))))]
-        [else (printf "undeliverable message:~s to:~s from:~s\n" msg to from)]
+        [else (log-warn "undeliverable message:~s to:~s from:~s" msg to from)]
         )))
 
   (define (spawn-actor a cl st)

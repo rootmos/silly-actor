@@ -109,7 +109,7 @@ void send(actor_id to, struct value v)
     m->next = NULL;
     enqueue(s.q, m);
 
-    info("enqueued msg: %d -> %d, %s", m->from, m->to, pretty_print(v));
+    debug("enqueued msg: %d -> %d, %s", m->from, m->to, pretty_print(v));
 }
 
 struct value sendM(struct value to, struct value data)
@@ -138,7 +138,7 @@ struct value spawnM(struct value cl, struct value state)
     spawn(cast_cl(cl), aid, state);
     send(aid, mk_sys(INIT));
 
-    info("spawning actor with id: %d", aid);
+    debug("spawning actor with id: %d", aid);
 
     return mk_aid(aid);
 }
@@ -207,6 +207,8 @@ void go(struct actor* a, struct closure* cl, struct value v)
 
 int main()
 {
+    set_log_level();
+
     initialize_system(&s);
 
     struct stack* root_stack = stack_fresh();
@@ -215,7 +217,7 @@ int main()
 
     while(dequeue(s.q, &s.current_msg)) {
         struct actor* a = fetch_actor(s.current_msg->to);
-        info("processing msg: %d -> %d, %s",
+        debug("processing msg: %d -> %d, %s",
              s.current_msg->from,
              s.current_msg->to,
              pretty_print(s.current_msg->v));

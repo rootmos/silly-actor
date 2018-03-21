@@ -16,46 +16,48 @@
 
 (define (interpret x)
   (let ([code (output-scheme (compile x))])
-    ;(pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 
 (define utf-8-transcoder
   (make-transcoder (utf-8-codec)))
+
+(define (read-objects p)
+  (reverse (let go ([acc '()])
+             (let ([o (read p)])
+               (cond
+                 [(eof-object? o) acc]
+                 [else (go (cons o acc))])))))
+
+(define (read-lines p)
+  (let go ([acc ""])
+    (let ([l (get-line p)])
+      (cond
+        [(eof-object? l) acc]
+        [else (go (string-append acc l "\n" ))]))))
 
 (define (run-c code)
   (let ([c-code (output-c (to-stack (compile code)))])
     (assert (c-backend c-code gcc-a-out))
     (let-values ([(to-stdin from-stdout from-stderr pid)
                   (open-process-ports "./a.out" 'line utf-8-transcoder)])
-      (let ([os (reverse (let go ([acc '()])
-                           (let ([o (read from-stdout)])
-                             (cond
-                               [(eof-object? o) acc]
-                               [else (go (cons o acc))]))))]
-            [err (let go ([acc ""])
-                   (let ([l (get-line from-stderr)])
-                     (cond
-                       [(eof-object? l) acc]
-                       [else (go (string-append acc l "\n" ))])))]
+      (let ([os (read-objects from-stdout)]
+            [err (read-lines from-stderr)]
             [ec (wait-for-pid pid)])
+        (close-port to-stdin) (close-port from-stdout)
+        (close-port from-stderr)
         (display err)
         (assert (eq? ec 0))
         os))))
 
 (define (test code expected)
-  (pretty-print code)
-  (let ([str (call-with-string-output-port (interpret code))])
-    (with-input-from-string str (lambda ()
-      (let ([a (reverse (let go ([acc '()])
-                          (let ([o (read)])
-                            (cond
-                              [(eof-object? o) acc]
-                              [else (go (cons o acc))]))))]
-            [ac (run-c code)])
-        (printf "actual:~s actual-c:~s expected:~s\n" a ac expected)
-        (assert (equal? a expected))
-        (assert (equal? ac expected))
-        )))))
+  (let* ([str (call-with-string-output-port (interpret code))]
+         [ac (run-c code)]
+         [a (with-input-from-string str
+              (lambda () (read-objects (current-input-port))))])
+    (log-info "actual:~a actual-c:~a expected:~a" a ac expected)
+    (assert (equal? a expected))
+    (assert (equal? ac expected))
+    ))
 
 (test
   '(system
