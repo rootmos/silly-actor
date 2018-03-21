@@ -1,8 +1,13 @@
 (library
   (utils)
   (export intercalate mk-string line-numbers
+          index
           log-info log-debug log-debug-lines)
   (import (scheme) (thunder-utils))
+
+  (define (index a b)
+    (let [(tail (member a (reverse b)))]
+      (and tail (length (cdr tail)))))
 
   (define (intercalate a xs)
     (cond

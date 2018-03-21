@@ -23,8 +23,7 @@ void print_stack(const struct stack* st)
     size_t N = stack_height(st);
     if (N == -1) {
         debug("stack empty");
-    }
-    else {
+    } else {
         debug("stack:");
         for (size_t n = 0; n <= stack_height(st); n++) {
             debug(" %u: %s", n, pretty_print(stov(stack_nth(st, n))));
@@ -37,3 +36,18 @@ void print_stack(const struct stack* st)
     { switch(w) {
 #define atoms_entry(w,a) case w: *p = a; *n = sizeof(a) - 1; break;
 #define atoms_end()   default: failwith("unknown atom: %lu", w); } }
+
+#define define_closure(cl,v) \
+    struct trampoline cl(struct stack* st, struct value v) { \
+        debug("in ~a(st)", pretty_print(v)); \
+        print_stack(st);
+
+#define end_closure() return yield(); }
+
+#define define_system() void setup_system(struct stack* st) {
+#define end_system() }
+
+#define push(v) stack_push(st,vtos(v))
+#define nth(n) stov(stack_nth(st,n))
+
+#define mk_cl(cl) make_closure(cl, stack_fork(st))

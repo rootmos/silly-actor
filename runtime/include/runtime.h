@@ -47,7 +47,7 @@ struct closure {
     struct stack* st;
 };
 
-struct value mk_cl(cl_t, struct stack*);
+struct value make_closure(cl_t, struct stack*);
 struct closure* cast_cl(struct value);
 
 struct actor {

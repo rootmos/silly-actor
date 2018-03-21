@@ -166,7 +166,7 @@ struct value selfM()
     return (struct value){.t=ACTOR_ID,.v=(word_t)(s.current_aid)};
 }
 
-struct value mk_cl(cl_t cl, struct stack* st)
+struct value make_closure(cl_t cl, struct stack* st)
 {
     struct closure* c = (struct closure*)malloc(sizeof(*c));
     c->f = cl;

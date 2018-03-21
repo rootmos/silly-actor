@@ -445,10 +445,6 @@
   (Options (o)
     (- (init bv v)) (+ (init n v))))
 
-(define (index a b)
-  (let [(tail (member a (reverse b)))]
-    (and tail (length (cdr tail)))))
-
 (define-pass to-stack : Lmonad (l) -> Lstack ()
   (Value : Value (v ctx) -> Value ()
     [(anf-val ,av) `(slot ,(index av ctx))])
@@ -506,14 +502,11 @@
   (definitions
     (define (indent n)
       (string-append "\n" (mk-string "" (map (lambda (_) "  ") (iota n)))))
-    (define value-type "struct value")
-    (define trampoline-type "struct trampoline")
-    (define stack-decl "struct stack* st")
     (define yield "return yield()")
     (define match_error "return match_error()")
     (define (continue k v) (format "return cont(~A,~A)" k v))
-    (define (push v) (format "stack_push(st,vtos(~A))" v))
-    (define (nth n) (format "stov(stack_nth(st,~D))" n))
+    (define (push v) (format "push(~A)" v))
+    (define (nth n) (format "nth(~D)" n))
     (define (car^ v) (format "car(~A)" v))
     (define (cdr^ v) (format "cdr(~A)" v))
     (define (is_cons v) (format "is_cons(~A)" v))
@@ -535,22 +528,9 @@
     (define (close k)
       (let* ([c cl-counter] [cl (format "cl_~s" c)] [v (fresh-var)])
         (set! cl-counter (+ c 1))
-        (set! cls (cons
-                    (format "~A ~A(~A,~A ~A) { debug(\"in ~a(%s)\", pretty_print(~a)); print_stack(st); ~a~A;~a~A;~n}"
-                            trampoline-type
-                            cl
-                            stack-decl
-                            value-type
-                            v
-                            cl
-                            v
-                            (indent 1)
-                            (k v)
-                            (indent 1)
-                            yield
-                            )
-                    cls))
-        (format "mk_cl(~A, stack_fork(st))" cl)))
+        (set! cls (cons (format "define_closure(~A,~A)~a~A;~nend_closure()"
+                                cl v (indent 1) (k v)) cls))
+        (format "mk_cl(~A)" cl)))
 
     (define atoms (make-eq-hashtable))
     (define (internalize-atom a)
@@ -571,8 +551,7 @@
                        (cons
                          (format "atoms_entry(~a,\"~a\")" (car vs) (car ks))
                          acc))]
-                  [else acc])))))))
-    )
+                  [else acc]))))))))
   (Value : Value (v) -> * ()
     [(slot ,n) (nth n)]
     [(sys ,s) (mk_sys s)]
@@ -584,9 +563,7 @@
     [(cons ,p0 ,p1)
      (let-values ([(cs0 bs0) (Pattern p0 (car^ v))]
                   [(cs1 bs1) (Pattern p1 (cdr^ v))])
-       (values
-         (cons (is_cons v) (append cs1 cs0))
-         (append bs1 bs0)))]
+       (values (cons (is_cons v) (append cs1 cs0)) (append bs1 bs0)))]
     [(bind) (values (list mk_true) (list (push v)))]
     [(slot ,n) (values (list (eq^ v (nth n))) '())]
     [(sys ,s) (values (list (eq^ v (mk_sys s))) '())]
@@ -607,12 +584,9 @@
                ))])
   (Expr : Expr (e k) -> * ()
     [(match ,v ,ma* ...)
-     (format
-       "~A {~a~A;~a}"
+     (format "~A {~a~A;~a}"
        (mk-string " " (map (lambda (ma) (MatchArm ma (Value v))) ma*))
-       (indent 2)
-       match_error
-       (indent 1))]
+       (indent 2) match_error (indent 1))]
     [(point ,v) (k (Value v))]
     [,mf
       (case mf
@@ -628,28 +602,21 @@
     [(>>= ,e0 ,e1)
      (Expr e0
        (lambda (w) (format "~A;~a~A" (push w) (indent 1) (Expr e1 k))))]
-
     [(continue ,n ,v) (continue (nth n) (Value v))]
-
     [(with/cc ,e) (format "~A;~a~A" (push (close k)) (indent 1)
-                          (Expr e (lambda (w) w)))]
-    )
+                          (Expr e (lambda (w) w)))])
   (ActorDef : ActorDef (ad) -> * ()
-    [(define ,e) (push
-                   (close (lambda (_)
-                          (Expr e (lambda (v) v)))))])
+    [(define ,e) (push (close (lambda (_) (Expr e (lambda (v) v)))))])
   (Options : Options (o) -> * ()
     [(init ,n ,v) (format "spawnM(~a,~a)" (nth n) (Value v))])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
      (let ([as (mk-string (string-append ";" (indent 1)) (map ActorDef ad*))])
-       (format "~A~n~A~nvoid setup_system(~A) {~a~A;~a~A;~n}~n"
+       (format "~A~n~A~ndefine_system()~a~A;~a~A;~nend_system()"
                (output-atoms-lookup)
                (mk-string "\n" (reverse cls))
-               stack-decl
                (indent 1)
                as
                (indent 1)
                (mk-string (string-append ";" (indent 1)) (map Options o*))
-               ))])
-  )
+               ))]))
