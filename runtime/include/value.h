@@ -44,4 +44,4 @@ bool eq(struct value v0, struct value v1);
 struct value car(struct value c);
 struct value cdr(struct value c);
 
-void pretty_print(int fd, struct value);
+const char* pretty_print(struct value);

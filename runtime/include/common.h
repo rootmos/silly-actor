@@ -22,9 +22,11 @@ void __failwith(const char* caller,
     fprintf(stderr, "%s:%d: ",                                  \
             __extension__ __FUNCTION__,__extension__ __LINE__); \
     fprintf(stderr, __VA_ARGS__);                               \
+    fprintf(stderr, "\n");                                      \
 } while (0)
 
 #define debug(...) do {                                          \
     fprintf(stderr, "%s:%s:%d: ", __extension__ __FUNCTION__,  __extension__ __FILE__, __extension__ __LINE__);         \
     fprintf(stderr, __VA_ARGS__);                               \
+    fprintf(stderr, "\n");                                      \
 } while (0)

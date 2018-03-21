@@ -15,7 +15,7 @@
 
 (define (interpret x)
   (let ([code (output-scheme (compile x))])
-    (pretty-print code)
+    ;(pretty-print code)
     (eval code (environment '(scheme) '(runtime)))))
 
 (define utf-8-transcoder
@@ -42,6 +42,7 @@
         os))))
 
 (define (test code expected)
+  (pretty-print code)
   (let ([str (call-with-string-output-port (interpret code))])
     (with-input-from-string str (lambda ()
       (let ([a (reverse (let go ([acc '()])

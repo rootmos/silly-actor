@@ -515,6 +515,19 @@
             (let ([hash (symbol-hash a)])
               (hashtable-set! atoms a hash)
               hash))))
+    (define output-atoms-lookup
+      (lambda ()
+        (let-values ([(keys vals) (hashtable-entries atoms)])
+          (format "atoms_begin() ~A atoms_end()"
+            (mk-string " "
+              (let go ([ks (vector->list keys)] [vs (vector->list vals)] [acc '()])
+                (cond
+                  [(pair? ks)
+                   (go (cdr ks) (cdr vs)
+                       (cons
+                         (format "atoms_entry(~a,\"~a\")" (car vs) (car ks))
+                         acc))]
+                  [else acc])))))))
     )
   (Value : Value (v) -> * ()
     [(slot ,n) (nth n)]
@@ -587,10 +600,9 @@
     [(init ,n ,v) (format "spawnM(~a,~a)" (nth n) (Value v))])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
-     (let ([as (fold-left string-append ""
-                          (intercalate (string-append ";" (indent 1))
-                                       (map ActorDef ad*)))])
-       (format "~A~nvoid setup_system(~A) {~a~A;~a~A;~n}~n"
+     (let ([as (mk-string (string-append ";" (indent 1)) (map ActorDef ad*))])
+       (format "~A~n~A~nvoid setup_system(~A) {~a~A;~a~A;~n}~n"
+               (output-atoms-lookup)
                (mk-string "\n" (reverse cls))
                stack-decl
                (indent 1)

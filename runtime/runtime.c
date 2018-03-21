@@ -1,6 +1,7 @@
 #include <assert.h>
-#include <common.h>
 
+#include <common.h>
+#include <stubs.h>
 #include <value.h>
 #include <runtime.h>
 #include <queue.h>
@@ -107,6 +108,8 @@ void send(actor_id to, struct value v)
     m->v = v;
     m->next = NULL;
     enqueue(s.q, m);
+
+    info("enqueued msg: %d -> %d, %s", m->from, m->to, pretty_print(v));
 }
 
 struct value sendM(struct value to, struct value data)
@@ -173,7 +176,7 @@ struct value mk_cl(cl_t cl, struct stack* st)
 
 struct trampoline output(struct stack* st, struct value v)
 {
-    pretty_print(1, msgM());
+    dprintf(1, "%s", pretty_print(msgM()));
     return yield();
 }
 
@@ -185,20 +188,18 @@ struct closure* null_closure(cl_t f)
     return cl;
 }
 
-extern void setup_system(struct stack*);
-
-void go(struct actor* a, struct value v)
+void go(struct actor* a, struct closure* cl, struct value v)
 {
-    struct trampoline t = (a->cl->f)(a->cl->st, v);
+    struct trampoline t = (cl->f)(cl->st, v);
     switch (t.a) {
     case YIELD: return;
-    default: not_implemented();
     case CONTINUE: {
-        set_clM(t.cl);
+        cl = cast_cl(t.cl);
         break;
     }
+    default: not_implemented();
     }
-    go(a, t.v);
+    go(a, cl, t.v);
 }
 
 int main()
@@ -211,9 +212,12 @@ int main()
 
     while(dequeue(s.q, &s.current_msg)) {
         struct actor* a = fetch_actor(s.current_msg->to);
-        info("processing msg: %d -> %d", s.current_msg->from, s.current_msg->to);
+        info("processing msg: %d -> %d, %s",
+             s.current_msg->from,
+             s.current_msg->to,
+             pretty_print(s.current_msg->v));
         s.current_aid = a->aid;
-        go(a, mk_nil());
+        go(a, a->cl, mk_nil());
     }
 
     return 0;

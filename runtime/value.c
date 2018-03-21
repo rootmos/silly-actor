@@ -1,7 +1,10 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include <value.h>
 #include <common.h>
+#include <stubs.h>
 
 struct cons {
     struct value car;
@@ -23,6 +26,8 @@ bool is_cons(struct value v)
 
 bool eq(struct value v0, struct value v1)
 {
+    debug("%s =?= %s", pretty_print(v0), pretty_print(v1));
+
     if(v0.t != v1.t) {
         return false;
     } else {
@@ -54,22 +59,81 @@ struct value cdr(struct value c)
     return ((struct cons*)c.v)->cdr;
 }
 
-void pretty_print(int fd, struct value v)
+void do_put_str(char**buf, int* rem, const char* s, size_t n)
+{
+    if(n > *rem) failwith("pretty_print buffer too small");
+    memcpy(*buf, s, n);
+    *rem -= n;
+    *buf += n;
+}
+
+void do_put_word(char**buf, int* rem, word_t w)
+{
+    int n = snprintf(*buf, *rem, "%lu", w);
+    if(n < 0) failwith("snprintf failed");
+    if(n > *rem) failwith("pretty_print buffer too small");
+    *rem -= n;
+    *buf += n;
+}
+
+#define do_put_lit(buf,rem,lit) do_put_str(buf,rem,lit,sizeof(lit)-1)
+
+void do_pretty_print(struct value v, char** buf, int* rem)
 {
     switch (v.t) {
-    case NIL: dprintf(fd, "()"); break;
-    case NUMBER: dprintf(fd, "(number . %d)", v.v); break;
-    case ATOM: not_implemented();
-    case CL: dprintf(fd, "<closure>"); break;
-    case SYS: not_implemented();
-    case ACTOR_ID: dprintf(fd, "<%d>", v.v); break;
+    case NIL: do_put_lit(buf, rem, "()"); break;
+    case NUMBER:
+        do_put_lit(buf, rem, "(number . ");
+        do_put_word(buf, rem, v.v);
+        do_put_lit(buf, rem, ")");
+        break;
+    case ATOM: {
+        do_put_lit(buf, rem, "(atom . ");
+        size_t n; const char* p;
+        atoms_lookup(v.v, &p, &n);
+        do_put_str(buf, rem, p, n);
+        do_put_lit(buf, rem, ")");
+        break;
+    }
+    case CL: do_put_lit(buf, rem, "<closure>"); break;
+    case SYS: {
+        switch (v.v) {
+        case ROOT: do_put_lit(buf, rem, "(sys . Root)"); break;
+        case OUTPUT: do_put_lit(buf, rem, "(sys . Output)"); break;
+        case INIT: do_put_lit(buf, rem, "(sys . Init)"); break;
+        default: failwith("unprintable sys atom");
+        }
+       break;
+    }
+    case ACTOR_ID:
+        do_put_lit(buf, rem, "<");
+        do_put_word(buf, rem, v.v);
+        do_put_lit(buf, rem, ">");
+        break;
     case CONS: {
         struct cons* c = (struct cons*)v.v;
-        dprintf(fd, "(");
-        pretty_print(fd, c->car);
-        dprintf(fd, ",");
-        pretty_print(fd, c->cdr);
-        dprintf(fd, ")");
+        do_put_lit(buf, rem, "(");
+        do_pretty_print(c->car, buf, rem);
+        do_put_lit(buf, rem, " . ");
+        do_pretty_print(c->cdr, buf, rem);
+        do_put_lit(buf, rem, ")");
+        break;
     }
     }
+}
+
+#define PRETTY_PRINT_BUF 1000
+
+const char* pretty_print(struct value v)
+{
+    static char buf[PRETTY_PRINT_BUF];
+    char* p = buf;
+    int rem = PRETTY_PRINT_BUF;
+    do_pretty_print(v, &p, &rem);
+    do_put_lit(&p, &rem, "\0");
+
+    size_t n = PRETTY_PRINT_BUF - rem;
+    p = malloc(n); assert(p);
+    memcpy(p, buf, n);
+    return p;
 }
