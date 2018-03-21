@@ -100,6 +100,11 @@ struct value msgM()
     return s.current_msg->v;
 }
 
+struct value parentM()
+{
+    return mk_aid(current_actor()->parent);
+}
+
 void send(actor_id to, struct value v)
 {
     struct msg* m = (struct msg*)malloc(sizeof(*m));

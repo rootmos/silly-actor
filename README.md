@@ -141,3 +141,15 @@ Examples
 ((atom . a) (atom . b))
 ```
 
+### Example: 12
+```scheme
+(system
+  ((init Main ()))
+  (define (Aux) (Init (send (parent) foo)))
+  (define (Main) (Init (spawn Aux ())) (foo (output bar))))
+```
+#### Output
+```scheme
+((atom . bar))
+```
+

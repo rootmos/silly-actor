@@ -22,6 +22,7 @@ struct trampoline match_error();
 struct trampoline value_error();
 
 struct value fromM();
+struct value parentM();
 struct value msgM();
 struct value sendM(struct value to, struct value msg);
 struct value spawnM(struct value cl, struct value state);

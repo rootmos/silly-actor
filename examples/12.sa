@@ -1,0 +1,7 @@
+(system
+  [(init Main ())]
+  (define (Aux) [Init (send (parent) foo)])
+  (define (Main)
+    [Init (spawn Aux ())]
+    [foo (output bar)])) 
+
