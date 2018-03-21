@@ -34,10 +34,6 @@ RUN git submodule update
 ADD examples examples
 ADD Makefile .
 ADD runtime runtime
-ADD tests.scm .
-ADD silly-actor.scm .
-ADD utils.scm .
-ADD c-backend.scm .
-ADD runtime.scm .
+ADD *.scm ./
 
 ENTRYPOINT ["make", "INFO=1"]
