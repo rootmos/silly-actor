@@ -75,4 +75,11 @@
        (filter (lambda (fn) (equal? (path-extension fn) "sa"))
                (directory-list d))))
 
-(for-all run-test (test-cases "examples"))
+(load "readme.scm")
+
+(let ([tcs (test-cases "examples")])
+  (for-all run-test tcs)
+  (generate-readme
+    (sort (lambda (a b) (string<? (test-case-name a) (test-case-name b)))
+          tcs)
+    ))
