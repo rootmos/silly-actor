@@ -1,7 +1,8 @@
-SCHEME=scheme --compile-imported-libraries --libdirs .:nanopass-framework-scheme:thunderchez
+SCHEME_BIN ?= scheme
+SCHEME=$(SCHEME_BIN) --compile-imported-libraries --libdirs .:nanopass-framework-scheme:thunderchez
 
 tests: runtime runtime-tests
-	timeout 2s $(SCHEME) --script tests.scm
+	timeout 20s $(SCHEME) --script tests.scm
 
 scheme:
 	$(SCHEME) silly-actor.scm
@@ -16,4 +17,8 @@ clean:
 	rm -f *.so
 	make -C runtime clean
 
-.PHONY: tests scheme clean runtime runtime-tests
+docker:
+	docker build -t silly-actor .
+	docker run --rm silly-actor
+
+.PHONY: tests scheme clean runtime runtime-tests docker
