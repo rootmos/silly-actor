@@ -18,7 +18,7 @@ struct trampoline {
 
 struct trampoline yield();
 struct trampoline cont(struct value cl, struct value v);
-struct trampoline match_error();
+struct trampoline match_error(struct value v);
 struct trampoline value_error();
 
 struct value fromM();

@@ -66,20 +66,18 @@
 (define (load-sexp fn) (call-with-input-file fn read-objects))
 
 (define (test-cases d)
-  (map (lambda (fn)
-         (let* ([n (path-last (path-root fn))]
-                [s (car (load-sexp (string-append d "/" n ".sa")))]
-                [e (load-sexp (string-append d "/" n ".expected"))]
-                [o (string-append d "/" n ".exe")])
-           (make-test-case n s e o)))
-       (filter (lambda (fn) (equal? (path-extension fn) "sa"))
-               (directory-list d))))
+  (sort (lambda (a b) (string<? (test-case-name a) (test-case-name b)))
+        (map (lambda (fn)
+               (let* ([n (path-last (path-root fn))]
+                      [s (car (load-sexp (string-append d "/" n ".sa")))]
+                      [e (load-sexp (string-append d "/" n ".expected"))]
+                      [o (string-append d "/" n ".exe")])
+                 (make-test-case n s e o)))
+             (filter (lambda (fn) (equal? (path-extension fn) "sa"))
+                     (directory-list d)))))
 
 (load "readme.scm")
 
 (let ([tcs (test-cases "examples")])
   (for-all run-test tcs)
-  (generate-readme
-    (sort (lambda (a b) (string<? (test-case-name a) (test-case-name b)))
-          tcs)
-    ))
+  (generate-readme tcs))

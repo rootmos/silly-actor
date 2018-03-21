@@ -98,9 +98,11 @@ void do_pretty_print(struct value v, char** buf, int* rem)
     case CL: do_put_lit(buf, rem, "<closure>"); break;
     case SYS: {
         switch (v.v) {
-        case ROOT: do_put_lit(buf, rem, "(sys . Root)"); break;
-        case OUTPUT: do_put_lit(buf, rem, "(sys . Output)"); break;
-        case INIT: do_put_lit(buf, rem, "(sys . Init)"); break;
+        case SYS_ROOT: do_put_lit(buf, rem, "(sys . Root)"); break;
+        case SYS_OUTPUT: do_put_lit(buf, rem, "(sys . Output)"); break;
+        case SYS_INIT: do_put_lit(buf, rem, "(sys . Init)"); break;
+        case SYS_DIED: do_put_lit(buf, rem, "(sys . Died)"); break;
+        case SYS_MATCH_ERROR: do_put_lit(buf, rem, "(sys . Match_error)"); break;
         default: failwith("unprintable sys atom");
         }
        break;

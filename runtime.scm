@@ -84,7 +84,7 @@
 
   (define (die ctx e)
     (let* ([a (ctx-a ctx)] [to (a-parent-id a)])
-      (send-message a to (cons '(sys . Died) e))
+      (send-message a to `(cons (sys . Died) ,e))
       (remove-actor a)
       ((ctx-k ctx))))
 
@@ -96,6 +96,7 @@
   (define (point x) (lambda (ctx env) (values x env)))
 
   (define (match x p env)
+    (log-trace "matching ~a ~a" x p)
     (cond
       [(eqv? 'wildcard p) env]
       [(and (pair? p) (pair? x)
@@ -118,7 +119,7 @@
     (lambda (ctx env)
       (let go ([qs ps])
         (cond
-          [(null? qs) (die ctx `(Match_error . ,x))]
+          [(null? qs) (die ctx `(cons (sys . Match_error) (cons ,x ())))]
           [(match x (caar qs) env) => (lambda (bs)
                                         ((cdar qs) ctx (append bs env)))]
           [else (go (cdr qs))]))))

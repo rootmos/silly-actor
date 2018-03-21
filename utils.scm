@@ -2,7 +2,7 @@
   (utils)
   (export intercalate mk-string line-numbers
           index
-          log-warn log-info log-debug log-trace-lines)
+          log-warn log-info log-debug log-trace log-trace-lines)
   (import (scheme) (thunder-utils))
 
   (define (index a b)

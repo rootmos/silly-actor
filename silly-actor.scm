@@ -13,7 +13,7 @@
     ))
 
 (define (sys? x)
-  (list? (member x '(Init Match_error Stopped Output))))
+  (list? (member x '(Init Match_error Stopped Output Died))))
 
 (define (bound-var? x)
   (and
@@ -503,7 +503,7 @@
     (define (indent n)
       (string-append "\n" (mk-string "" (map (lambda (_) "  ") (iota n)))))
     (define yield "return yield()")
-    (define match_error "return match_error()")
+    (define (match_error v) (format "return match_error(~A)" v))
     (define (continue k v) (format "return cont(~A,~A)" k v))
     (define (push v) (format "push(~A)" v))
     (define (nth n) (format "nth(~D)" n))
@@ -511,7 +511,7 @@
     (define (cdr^ v) (format "cdr(~A)" v))
     (define (is_cons v) (format "is_cons(~A)" v))
     (define (eq^ v w) (format "eq(~A, ~A)" v w))
-    (define (mk_sys s) (format "mk_sys(~A)" (string-upcase (symbol->string s))))
+    (define (mk_sys s) (format "mk_sys(SYS_~A)" (string-upcase (symbol->string s))))
     (define (mk_number n) (format "mk_number(~D)" n))
     (define mk_null "mk_nil()")
     (define mk_true "true")
@@ -586,7 +586,7 @@
     [(match ,v ,ma* ...)
      (format "~A {~a~A;~a}"
        (mk-string " " (map (lambda (ma) (MatchArm ma (Value v))) ma*))
-       (indent 2) match_error (indent 1))]
+       (indent 2) (match_error (Value v)) (indent 1))]
     [(point ,v) (k (Value v))]
     [,mf
       (case mf

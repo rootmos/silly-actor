@@ -52,7 +52,7 @@ void initialize_system(struct system* s)
     s->q = fresh_queue();
     s->next_aid = SYS_ATOMS_END;
 
-    s->current_aid = ROOT;
+    s->current_aid = SYS_ROOT;
 }
 
 struct closure* cast_cl(struct value v)
@@ -79,9 +79,36 @@ struct trampoline cont(struct value cl, struct value v)
     return (struct trampoline){.a=CONTINUE,.cl=cl,.v=v};
 }
 
-struct trampoline match_error()
+void send(actor_id to, struct value v)
 {
-    not_implemented();
+    struct msg* m = (struct msg*)malloc(sizeof(*m));
+    m->to = to;
+    m->from = s.current_aid;
+    m->v = v;
+    m->next = NULL;
+    enqueue(s.q, m);
+
+    debug("enqueued msg: %d -> %d, %s", m->from, m->to, pretty_print(v));
+}
+
+struct value sendM(struct value to, struct value data)
+{
+    send(cast_aid(to), data);
+    return mk_nil();
+}
+
+struct trampoline match_error(struct value v)
+{
+    send(current_actor()->parent,
+         mk_cons(
+             mk_sys(SYS_DIED),
+             mk_cons(
+                 mk_sys(SYS_MATCH_ERROR),
+                 mk_cons(v, mk_nil()))));
+
+    // TODO: remove actor
+
+    return (struct trampoline){.a=MATCH_ERROR};
 }
 
 struct trampoline value_error()
@@ -105,24 +132,6 @@ struct value parentM()
     return mk_aid(current_actor()->parent);
 }
 
-void send(actor_id to, struct value v)
-{
-    struct msg* m = (struct msg*)malloc(sizeof(*m));
-    m->to = to;
-    m->from = s.current_aid;
-    m->v = v;
-    m->next = NULL;
-    enqueue(s.q, m);
-
-    debug("enqueued msg: %d -> %d, %s", m->from, m->to, pretty_print(v));
-}
-
-struct value sendM(struct value to, struct value data)
-{
-    send(cast_aid(to), data);
-    return mk_nil();
-}
-
 struct actor* spawn(struct closure* cl, actor_id aid, struct value state)
 {
     struct actor* a = (struct actor*)malloc(sizeof(*a));
@@ -141,7 +150,7 @@ struct value spawnM(struct value cl, struct value state)
     s.next_aid += 1;
 
     spawn(cast_cl(cl), aid, state);
-    send(aid, mk_sys(INIT));
+    send(aid, mk_sys(SYS_INIT));
 
     debug("spawning actor with id: %d", aid);
 
@@ -199,6 +208,7 @@ void go(struct actor* a, struct closure* cl, struct value v)
     while (true) {
         t = (cl->f)(cl->st, v);
         switch (t.a) {
+        case MATCH_ERROR:
         case YIELD: return;
         case CONTINUE: {
             cl = cast_cl(t.cl);
@@ -218,7 +228,7 @@ int main()
 
     struct stack* root_stack = stack_fresh();
     setup_system(root_stack);
-    spawn(null_closure(output), OUTPUT, mk_nil());
+    spawn(null_closure(output), SYS_OUTPUT, mk_nil());
 
     while(dequeue(s.q, &s.current_msg)) {
         struct actor* a = fetch_actor(s.current_msg->to);

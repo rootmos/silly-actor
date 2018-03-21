@@ -17,13 +17,15 @@ enum value_type {
 };
 
 enum sys_atom {
-    ROOT=0,
-    OUTPUT,
-    INIT,
+    SYS_ROOT=0,
+    SYS_OUTPUT,
+    SYS_INIT,
+    SYS_DIED,
+    SYS_MATCH_ERROR,
     SYS_ATOMS_END
 };
 
-#define sys_actor(s) (s == OUTPUT)
+#define sys_actor(s) (s == SYS_OUTPUT)
 
 struct value {
     enum value_type t;

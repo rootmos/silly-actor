@@ -4,4 +4,3 @@
   (define (Main)
     [Init (spawn Aux ())]
     [foo (output bar)])) 
-

@@ -153,3 +153,19 @@ Examples
 ((atom . bar))
 ```
 
+### Example: 13
+```scheme
+(system
+  ((init Main ()))
+  (define (Aux) (na (output failure)))
+  (define (Main)
+    (Init (stay (spawn Aux ())))
+    ((Died Match_error Msg)
+      (let ([Child (state)] [From (from)])
+        (match From ['Child (output Msg)])))))
+```
+#### Output
+```scheme
+((sys . Init))
+```
+
