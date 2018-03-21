@@ -217,7 +217,8 @@
   (Expr (e)
     (- (recv ma* ...))
     (+ (with/cc (k) e))
-    (+ (continue k e))))
+    (+ (continue k e))
+    ))
 
 (define-pass continuation-constructs : Ldesugared (l) -> Lconts ()
   (definitions
@@ -355,6 +356,31 @@
        `(>>= ,(Expr e) (,a) (continue ,k ,(mk-anf-val a))))]
     ))
 
+(define-pass match-conts : Lmonad (l) -> Lmonad ()
+  (definitions
+    (define anf-m-counter 0)
+    (define (fresh-anf-m-var)
+      (let* ([c anf-m-counter]
+             [a (string->symbol (format "_anf-m-~s" c))])
+        (set! anf-m-counter (+ c 1)) a))
+
+    (define mcont-counter 0)
+    (define (fresh-mcont)
+      (let* ([c mcont-counter]
+             [k (string->symbol (format "_cont-m-~s" c))])
+        (set! mcont-counter (+ c 1)) k)))
+  ;(Pattern : Pattern (p) -> Pattern ())
+  ;(Value : Value (v) -> Value ())
+  (MatchArm : MatchArm (ma k) -> MatchArm ()
+    [(,p ,e)
+     (let ([a (fresh-anf-m-var)])
+     `(,p (>>= ,(Expr e) (,a) (continue ,k (anf-val ,a)))))])
+  (Expr : Expr (e) -> Expr ()
+    [(match ,v ,ma* ...)
+     (let ([k (fresh-mcont)])
+       `(with/cc (,k)
+          (match ,v ,(map (lambda (ma) (MatchArm ma k)) ma*) ...)))]))
+
 (define-pass output-scheme : Lmonad (l) -> * ()
   (Pattern : Pattern (p) -> * ()
     [(atom ,a) `'(atom . ,a)]
@@ -434,18 +460,34 @@
                    ([p1^ ctx^^] (Pattern p1 ctx^)))
        (values `(cons ,p0^ ,p1^) ctx^^))])
   (MatchArm : MatchArm (ma ctx) -> MatchArm ()
-    [(,p ,e) (let-values ([(p^ ctx^) (Pattern p ctx)])
-               `(,p^ ,(Expr e ctx^)))])
-  (Expr : Expr (e ctx) -> Expr ()
-    [(var ,bv) `(point (slot ,(index bv ctx)))]
+    [(,p ,e)
+     (let*-values ([(p^ ctx^) (Pattern p ctx)]
+                   [(e^ ctx^^) (Expr e ctx^)])
+               `(,p^ ,e^))])
+  (Expr : Expr (e ctx) -> Expr (ctx)
+    [(var ,bv)
+     (values `(point (slot ,(index bv ctx))) ctx)]
     [(match ,v ,ma* ...)
-     `(match ,(Value v ctx)
-             ,(map (lambda (ma) (MatchArm ma ctx)) ma*) ...)]
-    [(with/cc (,k) ,e) `(with/cc ,(Expr e (cons k ctx)))]
-    [(continue ,k ,v) `(continue ,(index k ctx) ,(Value v ctx))]
-    [(>>= ,e0 (,av) ,e1) `(>>= ,(Expr e0 ctx) ,(Expr e1 (cons av ctx)))])
+     (values
+       `(match ,(Value v ctx)
+               ,(map (lambda (ma) (MatchArm ma ctx)) ma*) ...)
+       ctx)]
+    [(with/cc (,k) ,e)
+     (let-values ([(e^ ctx^) (Expr e (cons k ctx))])
+       (values `(with/cc ,e^) ctx))]
+    [(close ,e)
+     (let-values ([(e^ ctx^) (Expr e ctx)])
+       (values `(close ,e^) ctx))]
+    [(continue ,k ,v)
+     (values `(continue ,(index k ctx) ,(Value v ctx)) ctx)]
+    [(>>= ,e0 (,av) ,e1)
+     (let*-values ([(e0^ ctx^) (Expr e0 ctx)]
+                   [(e1^ ctx^^) (Expr e1 (cons av ctx^))])
+       (values `(>>= ,e0^ ,e1^) ctx^^))])
   (ActorDef : ActorDef (ad ctx) -> ActorDef (ctx)
-    [(define (,bv) ,e) (values `(define ,(Expr e ctx)) (cons bv ctx))])
+    [(define (,bv) ,e)
+     (let-values ([(e^ ctx^) (Expr e ctx)])
+       (values `(define ,e^) (cons bv ctx)))])
   (Options : Options (o ctx) -> Options ()
     [(init ,bv ,v) `(init ,(index bv ctx) ,(Value v ctx))])
   (System : System (s) -> System ()
@@ -552,7 +594,7 @@
     [(atom ,a) (values (list (eq^ v (mk_atom a))) '())]
     [,null (values (list (eq^ v mk_null)) '())]
     [,wp (values (list mk_true) '())])
-  (MatchArm : MatchArm (ma v cl) -> * ()
+  (MatchArm : MatchArm (ma v) -> * ()
     [(,p ,e)
      (let-values ([(cs bs) (Pattern p v)])
        (format "if(~A) {~a~A;~a~A;~a} else"
@@ -560,18 +602,17 @@
                (indent 2)
                (mk-string ";" bs)
                (indent 2)
-               (Expr e (lambda (v) (continue cl v)))
+               (Expr e (lambda (w) w))
                (indent 1)
                ))])
   (Expr : Expr (e k) -> * ()
     [(match ,v ,ma* ...)
-     (let ([cl (close k)])
-       (format
-         "~A {~a~A;~a}"
-         (mk-string " " (map (lambda (ma) (MatchArm ma (Value v) cl)) ma*))
-         (indent 2)
-         match_error
-         (indent 1)))]
+     (format
+       "~A {~a~A;~a}"
+       (mk-string " " (map (lambda (ma) (MatchArm ma (Value v))) ma*))
+       (indent 2)
+       match_error
+       (indent 1))]
     [(point ,v) (k (Value v))]
     [,mf
       (case mf

@@ -8,7 +8,8 @@
                  tag-values
                  desugar
                  continuation-constructs
-                 to-monad))
+                 to-monad
+                 match-conts))
 
 (define (compile x)
   (fold-left (lambda (x f) ((eval f) x)) x passes))
@@ -53,7 +54,8 @@
             [ac (run-c code)])
         (printf "actual:~s actual-c:~s expected:~s\n" a ac expected)
         (assert (equal? a expected))
-        (assert (equal? ac expected)))))))
+        (assert (equal? ac expected))
+        )))))
 
 (test
   '(system
