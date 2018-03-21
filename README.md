@@ -4,51 +4,51 @@ silly-actor
 
 Examples
 --------
-## Example: 01
+### Example: 01
 ```scheme
 (system
   ((init Main ()))
   (define (Main) (Init (output (state)))))
 ```
-### Output
+#### Output
 ```scheme
 (())
 ```
 
-## Example: 02
+### Example: 02
 ```scheme
 (system
   ((init Main ()))
   (define (Main) (_ (seq (output 1) (output 2)))))
 ```
-### Output
+#### Output
 ```scheme
 ((number . 1) (number . 2))
 ```
 
-## Example: 03
+### Example: 03
 ```scheme
 (system
   ((init Main 7))
   (define (Main) (_ (output (state)))))
 ```
-### Output
+#### Output
 ```scheme
 ((number . 7))
 ```
 
-## Example: 04
+### Example: 04
 ```scheme
 (system
   ((init Main ()))
   (define (Main) (8 (output success)) (_ (send (self) 8))))
 ```
-### Output
+#### Output
 ```scheme
 ((atom . success))
 ```
 
-## Example: 05
+### Example: 05
 ```scheme
 (system
   ((init Main ()))
@@ -56,12 +56,12 @@ Examples
     (_ (seq (send (self) 8)
             (become (actor (8 (output success))) (state))))))
 ```
-### Output
+#### Output
 ```scheme
 ((atom . success))
 ```
 
-## Example: 06
+### Example: 06
 ```scheme
 (system
   ((init Main ()))
@@ -69,47 +69,47 @@ Examples
   (define (Main)
     (_ (let ([Id (spawn Aux success)]) (send Id 7)))))
 ```
-### Output
+#### Output
 ```scheme
 ((atom . success))
 ```
 
-## Example: 07
+### Example: 07
 ```scheme
 (system
   ((init Main ()))
   (define (Aux) (7 (output (state))) (_ ()))
   (define (Main) (_ (send (spawn Aux success) 7))))
 ```
-### Output
+#### Output
 ```scheme
 ((atom . success))
 ```
 
-## Example: 08
+### Example: 08
 ```scheme
 (system
   ((init Main ()))
   (define (Main)
     (_ (let ([X 7]) (match 7 ['X (output success)])))))
 ```
-### Output
+#### Output
 ```scheme
 ((atom . success))
 ```
 
-## Example: 09
+### Example: 09
 ```scheme
 (system
   ((init Main ()))
   (define (Main) (_ (match '(1 2) [(X _) (output X)]))))
 ```
-### Output
+#### Output
 ```scheme
 ((number . 1))
 ```
 
-## Example: 10
+### Example: 10
 ```scheme
 (system
   ((init Main ()))
@@ -118,12 +118,12 @@ Examples
     (_ (seq (send (spawn Aux ()) 7)
             (output (recv (8 success)))))))
 ```
-### Output
+#### Output
 ```scheme
 ((atom . success))
 ```
 
-## Example: 11
+### Example: 11
 ```scheme
 (system
   ((init Main ()))
@@ -136,7 +136,7 @@ Examples
          (seq (output (call Id 7 (8 a)))
               (output (call Id 9 (10 b))))))))
 ```
-### Output
+#### Output
 ```scheme
 ((atom . a) (atom . b))
 ```
