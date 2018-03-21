@@ -1,5 +1,6 @@
 silly-actor
 ===========
+[![Build Status](https://travis-ci.org/rootmos/silly-actor.svg?branch=master)](https://travis-ci.org/rootmos/silly-actor)
 
 Examples
 --------
