@@ -118,6 +118,11 @@ struct stack* stack_fork(const struct stack* st)
     return tt;
 }
 
+size_t stack_height(const struct stack* st)
+{
+    return st->sp;
+}
+
 #ifdef TEST
 #include <tests.h>
 

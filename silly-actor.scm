@@ -494,11 +494,13 @@
       (let* ([c cl-counter] [cl (format "cl_~s" c)] [v (fresh-var)])
         (set! cl-counter (+ c 1))
         (set! cls (cons
-                    (format "~A ~A(~A,~A ~A) {~a~A;~a~A;~n}"
+                    (format "~A ~A(~A,~A ~A) { debug(\"in ~a(%s)\", pretty_print(~a)); print_stack(st); ~a~A;~a~A;~n}"
                             trampoline-type
                             cl
                             stack-decl
                             value-type
+                            v
+                            cl
                             v
                             (indent 1)
                             (k v)
@@ -588,9 +590,8 @@
 
     [(continue ,n ,v) (continue (nth n) (Value v))]
 
-    [(with/cc ,e) (Expr e (lambda (v)
-                            (format "~A;~a~A"
-                                    (push (close k)) (indent 1) v)))]
+    [(with/cc ,e) (format "~A;~a~A" (push (close k)) (indent 1)
+                          (Expr e (lambda (w) w)))]
     )
   (ActorDef : ActorDef (ad) -> * ()
     [(define ,e) (push

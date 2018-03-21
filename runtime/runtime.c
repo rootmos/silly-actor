@@ -55,11 +55,11 @@ void initialize_system(struct system* s)
     s->current_aid = ROOT;
 }
 
-
-
 struct closure* cast_cl(struct value v)
 {
-    assert(v.t == CL);
+    if(v.t != CL) {
+        failwith("trying to cast %s to a closure", pretty_print(v));
+    }
     return (struct closure*)v.v;
 }
 
@@ -92,7 +92,7 @@ struct trampoline value_error()
 
 struct value fromM()
 {
-    not_implemented();
+    return mk_aid(s.current_msg->from);
 }
 
 struct value msgM()
@@ -190,16 +190,19 @@ struct closure* null_closure(cl_t f)
 
 void go(struct actor* a, struct closure* cl, struct value v)
 {
-    struct trampoline t = (cl->f)(cl->st, v);
-    switch (t.a) {
-    case YIELD: return;
-    case CONTINUE: {
-        cl = cast_cl(t.cl);
-        break;
+    struct trampoline t;
+    while (true) {
+        t = (cl->f)(cl->st, v);
+        switch (t.a) {
+        case YIELD: return;
+        case CONTINUE: {
+            cl = cast_cl(t.cl);
+            v = t.v;
+            break;
+        }
+        default: not_implemented();
+        }
     }
-    default: not_implemented();
-    }
-    go(a, cl, t.v);
 }
 
 int main()

@@ -18,6 +18,20 @@ struct stack_data vtos(struct value v)
     return sd;
 }
 
+void print_stack(const struct stack* st)
+{
+    size_t N = stack_height(st);
+    if (N == -1) {
+        debug("stack empty");
+    }
+    else {
+        debug("stack:");
+        for (size_t n = 0; n <= stack_height(st); n++) {
+            debug(" %u: %s", n, pretty_print(stov(stack_nth(st, n))));
+        }
+    }
+}
+
 #define atoms_begin() \
     void atoms_lookup(word_t w, const char** p, size_t* n) \
     { switch(w) {
