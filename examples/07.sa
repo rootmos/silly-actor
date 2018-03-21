@@ -1,0 +1,4 @@
+(system
+  [(init Main ())]
+  (define (Aux) [7 (output (state))] [_ ()])
+  (define (Main) [_ (send (spawn Aux success) 7)]))

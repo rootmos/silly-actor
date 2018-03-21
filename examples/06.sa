@@ -1,0 +1,4 @@
+(system
+  [(init Main ())]
+  (define (Aux) [7 (output (state))] [_ ()])
+  (define (Main) [_ (let ([Id (spawn Aux success)]) (send Id 7))]))

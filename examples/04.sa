@@ -1,0 +1,3 @@
+(system
+  [(init Main ())]
+  (define (Main) [8 (output success)] [_ (send (self) 8)]))

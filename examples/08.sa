@@ -1,0 +1,3 @@
+(system
+  [(init Main ())]
+  (define (Main) [_ (let ([X 7]) (match 7 ['X (output success)]))]))

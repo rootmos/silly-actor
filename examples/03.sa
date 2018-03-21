@@ -1,0 +1,3 @@
+(system
+  [(init Main 7)]
+  (define (Main) [_ (output (state))]))

@@ -1,0 +1,6 @@
+(system
+  [(init Main ())]
+  (define (Main)
+    [_ (seq
+         (send (self) 8)
+           (become (actor [8 (output success)]) (state)))]))

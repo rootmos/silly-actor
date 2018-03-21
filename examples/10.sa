@@ -1,0 +1,5 @@
+(system
+  [(init Main ())]
+  (define (Aux) [7 (reply 8)] [_ ()])
+  (define (Main)
+    [_ (seq (send (spawn Aux ()) 7) (output (recv [8 success])))]))

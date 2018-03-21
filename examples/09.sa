@@ -1,0 +1,3 @@
+(system
+  [(init Main ())]
+  (define (Main) [_ (match '(1 2) [(X _) (output X)])]))

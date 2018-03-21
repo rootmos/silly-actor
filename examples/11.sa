@@ -1,0 +1,8 @@
+(system
+  [(init Main ())]
+  (define (Aux) [7 (seq (reply 8) (reply 13))] [9 (reply 10)] [_ ()])
+  (define (Main)
+    [_ (let ([Id (spawn Aux ())])
+         (seq
+           (output (call Id 7 [8 a]))
+           (output (call Id 9 [10 b]))))]))
