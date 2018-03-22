@@ -101,9 +101,9 @@ struct trampoline match_error(struct value v)
 {
     send(current_actor()->parent,
          mk_cons(
-             mk_sys(SYS_DIED),
+             mk_sys(DIED),
              mk_cons(
-                 mk_sys(SYS_MATCH_ERROR),
+                 mk_sys(MATCH_ERROR),
                  mk_cons(v, mk_nil()))));
 
     // TODO: remove actor
@@ -159,7 +159,7 @@ struct value spawnM(struct value cl, struct value state)
     s.next_aid += 1;
 
     spawn(cast_cl(cl), aid, state);
-    send(aid, mk_sys(SYS_INIT));
+    send(aid, mk_sys(INIT));
 
     debug("spawning actor with id: %d", aid);
 
