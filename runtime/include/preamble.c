@@ -53,3 +53,5 @@ void print_stack(const struct stack* st)
 #define nth(n) stov(stack_nth(st,n))
 
 #define mk_cl(cl) make_closure(cl, stack_fork(st))
+
+#define predefined_atom(a,v) struct value ATOM_##a = v

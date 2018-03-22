@@ -35,7 +35,7 @@ struct value {
 struct value mk_cons(struct value v0, struct value v1);
 #define mk_atom(a) ((struct value){.t=ATOM,.v=a})
 #define mk_number(n) ((struct value){.t=NUMBER,.v=n})
-#define mk_sys(s) ((struct value){.t=SYS,.v=s})
+#define mk_sys(s) ((struct value){.t=SYS,.v=SYS_##s})
 #define mk_nil() ((struct value){.t=NIL,.v=0})
 #define mk_aid(aid) ((struct value){.t=ACTOR_ID,.v=aid})
 

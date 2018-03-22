@@ -132,6 +132,15 @@ struct value parentM()
     return mk_aid(current_actor()->parent);
 }
 
+struct value equalM(struct value a, struct value b)
+{
+    if (eq(a, b)) {
+        return ATOM_TRUE;
+    } else {
+        return ATOM_FALSE;
+    }
+}
+
 struct actor* spawn(struct closure* cl, actor_id aid, struct value state)
 {
     struct actor* a = (struct actor*)malloc(sizeof(*a));

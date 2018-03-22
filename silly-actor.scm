@@ -1,8 +1,24 @@
 (import (matchable) (nanopass) (utils))
 
+(define primfun-to-monadfun
+  '((stop 0 stopM)
+    (spawn 2 spawnM)
+    (send 2 sendM)
+    (from 0 fromM)
+    (msg 0 msgM)
+    (parent 0 parentM)
+    (state 0 stateM)
+    (self 0 selfM)
+    (set-state! 1 set-stateM)
+    (set-cl! 1 set-clM)
+    (yield 0 yieldM)
+    (= 2 equalM)
+    ))
+
+(define syntactic-sugar '(become stay output reply))
+
 (define (fun? x)
-  (list? (member x '(stop spawn send become stay
-                          from msg parent state self output reply))))
+  (list? (member x (append (map car primfun-to-monadfun) syntactic-sugar))))
 
 (define (atom? x)
   (and
@@ -31,6 +47,7 @@
 
 (define (variable-pattern? x)
   (match x [('unquote s) (atom? s)] [else #f]))
+
 (define (wildcard-pattern? x)
   (and
     [symbol? x]
@@ -155,9 +172,7 @@
     [,bv `(var ,bv)])
   )
 
-(define (primfun? x)
-  (list? (member x '(stop spawn send from msg parent state
-                          self set-state! set-cl! yield))))
+(define (primfun? x) (list? (member x (map car primfun-to-monadfun))))
 
 (define (cont? x)
   (and
@@ -237,20 +252,6 @@
                        [_ (continue ,k
                             (match (msg) ,(map MatchArm ma*) ...))]))
             (yield))))]))
-
-(define primfun-to-monadfun
-  '((stop 0 stopM)
-    (spawn 2 spawnM)
-    (send 2 sendM)
-    (from 0 fromM)
-    (msg 0 msgM)
-    (parent 0 parentM)
-    (state 0 stateM)
-    (self 0 selfM)
-    (set-state! 1 set-stateM)
-    (set-cl! 1 set-clM)
-    (yield 0 yieldM)
-    ))
 
 (define (monadfun? x)
   (list? (member x (map caddr primfun-to-monadfun))))
@@ -511,7 +512,7 @@
     (define (cdr^ v) (format "cdr(~A)" v))
     (define (is_cons v) (format "is_cons(~A)" v))
     (define (eq^ v w) (format "eq(~A, ~A)" v w))
-    (define (mk_sys s) (format "mk_sys(SYS_~A)" (string-upcase (symbol->string s))))
+    (define (mk_sys s) (format "mk_sys(~A)" (string-upcase (symbol->string s))))
     (define (mk_number n) (format "mk_number(~D)" n))
     (define mk_null "mk_nil()")
     (define mk_true "true")
@@ -539,6 +540,13 @@
             (let ([hash (symbol-hash a)])
               (hashtable-set! atoms a hash)
               hash))))
+
+    (define (mk-predefined-atoms)
+      (mk-string "" (map (lambda (a) (format "predefined_atom(~a,~a);"
+                                             (string-upcase (symbol->string a))
+                                             (mk_atom a)))
+                         '(true false))))
+
     (define output-atoms-lookup
       (lambda ()
         (let-values ([(keys vals) (hashtable-entries atoms)])
@@ -611,9 +619,11 @@
     [(init ,n ,v) (format "spawnM(~a,~a)" (nth n) (Value v))])
   (System : System (s) -> * ()
     [(system (,o* ...) ,ad* ...)
-     (let ([as (mk-string (string-append ";" (indent 1)) (map ActorDef ad*))])
-       (format "~A~n~A~ndefine_system()~a~A;~a~A;~nend_system()"
+     (let ([as (mk-string (string-append ";" (indent 1)) (map ActorDef ad*))]
+           [pa (mk-predefined-atoms)])
+       (format "~A~n~A~n~A~ndefine_system()~a~A;~a~A;~nend_system()"
                (output-atoms-lookup)
+               pa
                (mk-string "\n" (reverse cls))
                (indent 1)
                as

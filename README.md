@@ -169,3 +169,18 @@ Examples
 ((sys . Init))
 ```
 
+### Example: eq
+```scheme
+(system
+  ((init Main ()))
+  (define (Main)
+    (_ (seq (output (= 1 1)) (output (= 1 2)) (output (= 1 foo))
+            (output (= foo foo)) (output (= foo bar)) (output (= () ()))
+            (output (= 1 ()))))))
+```
+#### Output
+```scheme
+((atom . true) (atom . false) (atom . false) (atom . true)
+  (atom . false) (atom . true) (atom . false))
+```
+

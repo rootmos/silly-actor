@@ -31,6 +31,8 @@ struct value selfM();
 struct value set_stateM(struct value state);
 struct value set_clM(struct value cl);
 
+struct value equalM(struct value a, struct value b);
+
 typedef struct trampoline (*cl_t)(struct stack*, struct value);
 
 

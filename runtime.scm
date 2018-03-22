@@ -1,6 +1,7 @@
 (library (runtime)
   (export >>= point
           stateM msgM fromM selfM set-stateM set-clM parentM
+          equalM
           lookupM matchM closeM
           spawnM sendM stopM
           with/ccM continueM yieldM
@@ -76,6 +77,10 @@
   (define fromM (lambda (ctx env) (values (ctx-from ctx) env)))
   (define selfM (lambda (ctx env) (values (a-id (ctx-a ctx)) env)))
   (define parentM (lambda (ctx env) (values (a-parent-id (ctx-a ctx)) env)))
+
+  (define (equalM a b)
+    (lambda (ctx env)
+      (values (if (equal? a b) '(atom . true) '(atom . false)) env)))
 
   (define (with/ccM kv m)
     (lambda (ctx env)
