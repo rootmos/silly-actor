@@ -3,7 +3,4 @@
   (define (Aux) [na (output failure)])
   (define (Main)
     [Init (stay (spawn Aux ()))]
-    [(Died Match_error Msg)
-      (let ([Child (state)] [From (from)])
-        (match From
-          ['Child (output Msg)]))]))
+    [(Died Match_error Msg) (let ([true (= (state) (from))]) (output Msg))]))

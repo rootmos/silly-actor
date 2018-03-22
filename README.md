@@ -161,8 +161,7 @@ Examples
   (define (Main)
     (Init (stay (spawn Aux ())))
     ((Died Match_error Msg)
-      (let ([Child (state)] [From (from)])
-        (match From ['Child (output Msg)])))))
+      (let ([true (= (state) (from))]) (output Msg)))))
 ```
 #### Output
 ```scheme
