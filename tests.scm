@@ -33,10 +33,15 @@
     (let ([l (get-line p)])
       (cond
         [(eof-object? l) acc]
-        [else (go (string-append acc l "\n" ))]))))
+        [else (go (string-append acc l "\n"))]))))
 
 (define (run-c code output)
-  (let ([c-code (output-c (to-stack (compile code)))])
+  (pretty-print
+    (unparse-Lstack
+      (to-stack
+        (de-bruijn
+          (compile code)))))
+  (let ([c-code (output-c (de-bruijn (compile code)))])
     (assert (c-backend c-code (gcc-with-output output)))
     (let-values ([(to-stdin from-stdout from-stderr pid)
                   (open-process-ports output 'line utf-8-transcoder)])
@@ -77,6 +82,8 @@
                      (directory-list d)))))
 
 (load "readme.scm")
+
+(pretty-print (language->s-expression Lstack))
 
 (let ([tcs (test-cases "examples")])
   (for-all run-test tcs)

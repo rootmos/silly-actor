@@ -423,7 +423,7 @@
         ,(cons 'list  (map ActorDef ad*)))]))
 
 (define-language
-  Lstack
+  Lde-bruijn
   (extends Lmonad)
   (terminals
     (- (anf-val (av)))
@@ -446,7 +446,7 @@
   (Options (o)
     (- (init bv v)) (+ (init n v))))
 
-(define-pass to-stack : Lmonad (l) -> Lstack ()
+(define-pass de-bruijn : Lmonad (l) -> Lde-bruijn ()
   (Value : Value (v ctx) -> Value ()
     [(anf-val ,av) `(slot ,(index av ctx))])
   (Pattern : Pattern (p ctx) -> Pattern (ctx)
@@ -499,7 +499,7 @@
             [o*^ (map (lambda (o) (Options o ctx^)) o*)])
        `(system (,o*^ ...) ,ad*^ ...))]))
 
-(define-pass output-c : Lstack (l) -> * ()
+(define-pass output-c : Lde-bruijn (l) -> * ()
   (definitions
     (define (indent n)
       (string-append "\n" (mk-string "" (map (lambda (_) "  ") (iota n)))))
@@ -630,3 +630,130 @@
                (indent 1)
                (mk-string (string-append ";" (indent 1)) (map Options o*))
                ))]))
+
+(define (closure? x)
+  (and
+    [symbol? x]
+    [>= (string-length (symbol->string x)) 3]
+    [equal? (substring (symbol->string x) 0 3) "cl-"]
+    ))
+
+(define-language
+  Lstack
+  (terminals
+    (number (n))
+    (monadfun (mf))
+    (sys (s))
+    (atom (a))
+    (closure (cl)))
+  (entry System)
+  (Value (v)
+    (nil)
+    (number n)
+    (nth n)
+    (car v)
+    (cdr v)
+    (cons v0 v1)
+    mf
+    (mf v* ...)
+    (arg)
+    (sys s)
+    (atom a)
+    (closure-ref cl))
+  (Cond (c)
+    (true)
+    (eq v0 v1)
+    (and c0 c1)
+    (is-cons v))
+  (CondArm (ca) (c st))
+  (Statement (st)
+    (push v)
+    (yield)
+    (match-error v)
+    (continue v0 v1)
+    (cond ca* ...)
+    (and_then st0 st1)
+    (discard v)
+    )
+  (Closure (closure)
+    (nullary cl st)
+    (unary cl st))
+  (System (syst)
+    (system (closure* ...) st)))
+
+(define-pass to-stack : Lde-bruijn (l) -> Lstack ()
+  (definitions
+    (define cl-counter 0)
+    (define cls '())
+    (with-output-language (Lstack Value)
+      (define mk-nil `(nil))
+      (define mk-arg `(arg))
+      (define (mk-nth n) `(nth ,n))
+      (define (mk-cl cl) `(closure-ref ,cl)))
+    (with-output-language (Lstack CondArm)
+      (define (match-error-arm v)
+        `((true) (match-error ,v))))
+    (with-output-language (Lstack Closure)
+      (define (close k arity)
+        (let* ([c cl-counter] [cl (string->symbol (format "cl-~s" c))])
+          (set! cl-counter (+ c 1))
+          (set! cls (cons (case arity
+                            [0 `(nullary ,cl ,(k mk-nil))]
+                            [1 `(unary ,cl ,(k mk-arg))])
+                          cls))
+          (mk-cl cl)))))
+  (Value : Value (v) -> Value ()
+    [(slot ,n) `(nth ,n)]
+    [,null `(nil)])
+  (Pattern : Pattern (p v) -> Cond (bs)
+    [(cons ,p0 ,p1)
+     (let-values
+       ([(cs0 bs0) (Pattern p0 (with-output-language (Lstack Value) `(car ,v)))]
+        [(cs1 bs1) (Pattern p1 (with-output-language (Lstack Value) `(cdr ,v)))])
+       (values `(and (is-cons ,v) (and ,cs0 ,cs1)) (append bs1 bs0)))]
+    [(bind) (values `(true) (list v))]
+    [(slot ,n) (values `(eq ,v (nth ,n)) '())]
+    [(sys ,s) (values `(eq ,v (sys ,s)) '())]
+    [(atom ,a) (values `(eq ,v (atom ,a)) '())]
+    [(number ,n) (values `(eq ,v (number ,n)) '())]
+    [,null (values `(eq ,v (nil)) '())]
+    [,wp (values `(true) '())])
+  (MatchArm : MatchArm (ma v) -> CondArm ()
+    [(,p ,e)
+     (let-values ([(cs bs) (Pattern p (Value v))])
+      `(,cs
+         ,(let go ([bs^ bs])
+             (case bs^
+               ['() (Expr e (lambda (w) w))]
+               [else `(and_then (push ,(car bs^)) ,(go (cdr bs^)))]))))])
+  (Expr : Expr (e k) -> Statement ()
+    [(point ,v) (k (Value v))]
+    [(match ,v ,ma* ...)
+     (let ([arms (append (map (lambda (ma) (MatchArm ma v)) ma*)
+                         (list (match-error-arm (Value v))))])
+       `(cond ,arms ...))]
+    [,mf (k (with-output-language (Lstack Value) `,mf))]
+    [(,mf ,v* ...)
+     (k (with-output-language (Lstack Value) `(,mf ,(map Value v*) ...)))]
+    [(continue ,n ,v) `(continue (nth ,n) ,(Value v))]
+    [(close ,e) (k (close (lambda (_) (Expr e (lambda (v) `(discard ,v)))) 0))]
+    [(>>= ,e0 ,e1) (Expr e0 (lambda (z) `(and_then (push ,z) ,(Expr e1 k))))]
+    [(with/cc ,e)
+     `(and_then (push ,(close k 1)) ,(Expr e (lambda (w) `(discard ,w))))])
+  (ActorDef : ActorDef (ad) -> Statement ()
+    [(define ,e)
+     `(push ,(close
+               (lambda (_)
+                 (Expr e (lambda (w)
+                           (with-output-language (Lstack Statement)
+                                                      `(discard ,w))))) 0))])
+  (Options : Options (o) -> Statement ()
+    [(init ,n ,v) `(discard (spawnM ,(list (mk-nth n) (Value v)) ...))])
+  (System : System (syst) -> System ()
+    [(system (,o* ...) ,ad* ...)
+     (let ([as (let go ([sts (append (map ActorDef ad*) (map Options o*))])
+                 (cond
+                   [(null? (cdr sts)) (car sts)]
+                   [else (with-output-language (Lstack Statement)
+                           `(and_then ,(car sts) ,(go (cdr sts))))]))])
+       `(system (,(reverse cls) ...) ,as))]))
