@@ -37,10 +37,11 @@
 
 (define (run-c code output)
   (pretty-print
-    (unparse-Lstack
-      (to-stack
-        (de-bruijn
-          (compile code)))))
+    (unparse-Lstack-with-atom-defs
+      (collect-atoms
+        (to-stack
+          (de-bruijn
+            (compile code))))))
   (let ([c-code (output-c (de-bruijn (compile code)))])
     (assert (c-backend c-code (gcc-with-output output)))
     (let-values ([(to-stdin from-stdout from-stderr pid)
@@ -82,8 +83,6 @@
                      (directory-list d)))))
 
 (load "readme.scm")
-
-(pretty-print (language->s-expression Lstack))
 
 (let ([tcs (test-cases "examples")])
   (for-all run-test tcs)

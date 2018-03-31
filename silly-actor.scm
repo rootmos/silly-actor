@@ -757,3 +757,45 @@
                    [else (with-output-language (Lstack Statement)
                            `(and_then ,(car sts) ,(go (cdr sts))))]))])
        `(system (,(reverse cls) ...) ,as))]))
+
+(define-language
+  Lstack-with-atom-defs
+  (extends Lstack)
+  (terminals
+    (+ (string (str)))
+    (- (atom (a))))
+  (Value (v)
+    (- (atom a))
+    (+ (atom n)))
+  (AtomDef (ad)
+    (+ (n str)))
+  (System (syst)
+    (- (system (closure* ...) st))
+    (+ (system (ad* ...) (closure* ...) st))))
+
+(define-pass collect-atoms : Lstack (l) -> Lstack-with-atom-defs ()
+  (definitions
+    (define atoms (make-eq-hashtable))
+    (define (internalize-atom a)
+      (or (hashtable-ref atoms a #f)
+          (begin
+            (let ([hash (symbol-hash a)])
+              (hashtable-set! atoms a hash) hash))))
+    (with-output-language (Lstack-with-atom-defs AtomDef)
+      (define (mk-atom-defs)
+        (for-each internalize-atom '(true false))
+        (let-values ([(keys vals) (hashtable-entries atoms)])
+          (let go ([ks (vector->list keys)] [vs (vector->list vals)] [acc '()])
+            (cond
+              [(pair? ks)
+               (go (cdr ks) (cdr vs)
+                   (cons `(,(car vs) ,(symbol->string (car ks))) acc))]
+              [else acc]))))))
+  (Value : Value (v) -> Value ()
+    [(atom ,a) `(atom ,(internalize-atom a))])
+  (Statement : Statement (st) -> Statement ())
+  (Closure : Closure (cl) -> Closure ())
+  (System : System (syst) -> System ()
+    [(system (,closure* ...) ,st)
+     (let ([cl* (map Closure closure*)] [st^ (Statement st)])
+       `(system (,(mk-atom-defs) ...) (,cl* ...) ,st^))]))
