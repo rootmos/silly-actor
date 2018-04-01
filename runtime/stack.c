@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 struct slot {
     struct stack_data data;
@@ -29,7 +30,7 @@ struct stack {
 
 struct stack* stack_fresh()
 {
-    struct stack* st = (struct stack*)malloc(sizeof(*st));
+    struct stack* st = (struct stack*)malloc(sizeof(*st)); assert(st);
     st->sp = -1;
     st->fork = false;
 
@@ -48,6 +49,10 @@ void stack_push(struct stack* st, struct stack_data data)
     size_t sp0 = st->sp;
     size_t sp1 = st->sp += 1;
     struct block* block = st->block;
+
+    if (sp1 >= block->N) {
+        failwith("stack overflow");
+    }
 
     if (st->fork) {
         block->slots[sp0].fork_count -= 1;
@@ -110,7 +115,7 @@ struct stack* stack_fork(const struct stack* st)
 {
     if (st->sp == -1) return stack_fresh();
 
-    struct stack* tt = (struct stack*)malloc(sizeof(*tt));
+    struct stack* tt = (struct stack*)malloc(sizeof(*tt)); assert(tt);
     tt->block = st->block;
     tt->sp = st->sp;
     tt->fork = true;

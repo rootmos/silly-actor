@@ -81,7 +81,7 @@ struct trampoline cont(struct value cl, struct value v)
 
 void send(actor_id to, struct value v)
 {
-    struct msg* m = (struct msg*)malloc(sizeof(*m));
+    struct msg* m = (struct msg*)malloc(sizeof(*m)); assert(m);
     m->to = to;
     m->from = s.current_aid;
     m->v = v;
@@ -152,7 +152,7 @@ struct value addR(struct value a, struct value b)
 
 struct actor* spawn(struct closure* cl, actor_id aid, struct value state)
 {
-    struct actor* a = (struct actor*)malloc(sizeof(*a));
+    struct actor* a = (struct actor*)malloc(sizeof(*a)); assert(a);
     a->aid = aid;
 
     a->cl = cl;
@@ -200,7 +200,7 @@ struct value selfR()
 
 struct value make_closure(cl_t cl, struct stack* st)
 {
-    struct closure* c = (struct closure*)malloc(sizeof(*c));
+    struct closure* c = (struct closure*)malloc(sizeof(*c)); assert(c);
     c->f = cl;
     c->st = st;
     return (struct value){.t=CL,.v=(word_t)c};
@@ -214,9 +214,9 @@ struct trampoline output(struct stack* st, struct value v)
 
 struct closure* null_closure(cl_t f)
 {
-    struct closure* cl = (struct closure*)malloc(sizeof(*cl));
+    struct closure* cl = (struct closure*)malloc(sizeof(*cl)); assert(cl);
     cl->f = f;
-    cl->st = NULL;
+    cl->st = stack_fresh();
     return cl;
 }
 
@@ -224,7 +224,7 @@ void go(struct actor* a, struct closure* cl, struct value v)
 {
     struct trampoline t;
     while (true) {
-        t = (cl->f)(cl->st, v);
+        t = (cl->f)(stack_fork(cl->st), v);
         switch (t.a) {
         case MATCH_ERROR:
         case YIELD: return;

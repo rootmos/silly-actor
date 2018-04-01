@@ -19,6 +19,6 @@ clean:
 
 docker:
 	docker build -t silly-actor .
-	docker run --rm silly-actor
+	docker run --rm --memory=100m silly-actor
 
 .PHONY: tests scheme clean runtime runtime-tests docker

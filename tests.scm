@@ -57,16 +57,17 @@
 (define-record-type test-case (fields name source expected output))
 
 (define (run-test tc)
-  (let* ([str (call-with-string-output-port
-                (interpret (test-case-source tc)))]
+  (log-info "running test: ~a" (test-case-name tc))
+  (let* (;[str (call-with-string-output-port (interpret (test-case-source tc)))]
          [ac (run-c (test-case-source tc) (test-case-output tc))]
-         [a (with-input-from-string str
-              (lambda () (read-objects (current-input-port))))])
-    (log-info "tc:~s actual:~a actual-c:~a expected:~a"
+         ;[a (with-input-from-string str (lambda () (read-objects (current-input-port))))]
+         )
+    (log-info "tc:~s actual-c:~a expected:~a"
               (test-case-name tc)
-              a ac
+              ;a
+              ac
               (test-case-expected tc))
-    (assert (equal? a (test-case-expected tc)))
+    ;(assert (equal? a (test-case-expected tc)))
     (assert (equal? ac (test-case-expected tc)))
     ))
 
