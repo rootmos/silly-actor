@@ -12,7 +12,7 @@ void __failwith(const char* caller,
                 const char* fmt, ...)
     __attribute__ ((noreturn));
 
-#define log(l, ...) do {                                          \
+#define log(l, ...) do { \
     if(log_level >= l) { \
         fprintf(stderr, "%s:%s:%d: ", \
                 __extension__ __FUNCTION__, \

@@ -45,29 +45,36 @@
 (define (run-c code output)
   (let ([c-code (compile code backend-passes)])
     (assert (c-backend c-code (gcc-with-output output)))
-    (let-values ([(to-stdin from-stdout from-stderr pid)
-                  (open-process-ports output 'line utf-8-transcoder)])
-      (let ([os (read-objects from-stdout)]
-            [err (read-lines from-stderr)]
-            [ec (wait-for-pid pid)])
-        (display err)
-        (assert (eq? ec 0))
-        os))))
+    (let* ([stdout (format "~a.stdout" output)]
+           [stderr (format "~a.stderr" output)]
+           [cmd (format "exec ~a 1>~a 2>~a" output stdout stderr)])
+      (log-debug "running: ~a" cmd)
+      (apply
+        (lambda (from-stdout to-stdin pid)
+          (close-port to-stdin)
+          (close-port from-stdout)
+          (let ([ec (wait-for-pid pid)])
+            (assert (eq? ec 0))
+            (let ([os (with-input-from-file stdout
+                        (lambda () (read-objects (current-input-port))))]
+                  [err (with-input-from-file stderr
+                         (lambda () (read-lines (current-input-port))))])
+              (display err) os)))
+        (process cmd)))))
 
 (define-record-type test-case (fields name source expected output))
 
 (define (run-test tc)
   (log-info "running test: ~a" (test-case-name tc))
-  (let* (;[str (call-with-string-output-port (interpret (test-case-source tc)))]
+  (let* ([str (call-with-string-output-port (interpret (test-case-source tc)))]
          [ac (run-c (test-case-source tc) (test-case-output tc))]
-         ;[a (with-input-from-string str (lambda () (read-objects (current-input-port))))]
+         [a (with-input-from-string str (lambda () (read-objects (current-input-port))))]
          )
-    (log-info "tc:~s actual-c:~a expected:~a"
+    (log-info "tc:~s actual:~a actual-c:~a expected:~a"
               (test-case-name tc)
-              ;a
-              ac
+              a ac
               (test-case-expected tc))
-    ;(assert (equal? a (test-case-expected tc)))
+    (assert (equal? a (test-case-expected tc)))
     (assert (equal? ac (test-case-expected tc)))
     ))
 

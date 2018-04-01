@@ -5,6 +5,7 @@
 #include <value.h>
 #include <runtime.h>
 #include <queue.h>
+#include <mem.h>
 
 #include <stdlib.h>
 
@@ -47,7 +48,7 @@ struct actor* current_actor()
 void initialize_system(struct system* s)
 {
     s->N = 100;
-    s->as = (struct actor**)calloc(sizeof(struct actor*), s->N);
+    s->as = (struct actor**)my_calloc(sizeof(struct actor*), s->N);
 
     s->q = fresh_queue();
     s->next_aid = SYS_ATOMS_END;
@@ -81,7 +82,7 @@ struct trampoline cont(struct value cl, struct value v)
 
 void send(actor_id to, struct value v)
 {
-    struct msg* m = (struct msg*)malloc(sizeof(*m)); assert(m);
+    struct msg* m = (struct msg*)my_malloc(sizeof(*m)); assert(m);
     m->to = to;
     m->from = s.current_aid;
     m->v = v;
@@ -152,7 +153,7 @@ struct value addR(struct value a, struct value b)
 
 struct actor* spawn(struct closure* cl, actor_id aid, struct value state)
 {
-    struct actor* a = (struct actor*)malloc(sizeof(*a)); assert(a);
+    struct actor* a = (struct actor*)my_malloc(sizeof(*a)); assert(a);
     a->aid = aid;
 
     a->cl = cl;
@@ -200,7 +201,7 @@ struct value selfR()
 
 struct value make_closure(cl_t cl, struct stack* st)
 {
-    struct closure* c = (struct closure*)malloc(sizeof(*c)); assert(c);
+    struct closure* c = (struct closure*)my_malloc(sizeof(*c)); assert(c);
     c->f = cl;
     c->st = st;
     return (struct value){.t=CL,.v=(word_t)c};
@@ -214,7 +215,7 @@ struct trampoline output(struct stack* st, struct value v)
 
 struct closure* null_closure(cl_t f)
 {
-    struct closure* cl = (struct closure*)malloc(sizeof(*cl)); assert(cl);
+    struct closure* cl = (struct closure*)my_malloc(sizeof(*cl)); assert(cl);
     cl->f = f;
     cl->st = stack_fresh();
     return cl;
@@ -238,6 +239,8 @@ void go(struct actor* a, struct closure* cl, struct value v)
     }
 }
 
+#include <linux/unistd.h>
+
 int main()
 {
     set_log_level();
@@ -249,11 +252,11 @@ int main()
     spawn(null_closure(output), SYS_OUTPUT, mk_nil());
 
     while(dequeue(s.q, &s.current_msg)) {
-        struct actor* a = fetch_actor(s.current_msg->to);
         debug("processing msg: %d -> %d, %s",
              s.current_msg->from,
              s.current_msg->to,
              pretty_print(s.current_msg->v));
+        struct actor* a = fetch_actor(s.current_msg->to);
         s.current_aid = a->aid;
         go(a, a->cl, mk_nil());
     }

@@ -25,8 +25,8 @@ void print_stack(const struct stack* st)
         log(STDERR, "stack empty");
     } else {
         log(STDERR, "stack:");
-        for (size_t n = 0; n <= stack_height(st); n++) {
-            log(STDERR, " %u: %s", n, pretty_print(stov(stack_nth(st, n))));
+        for (size_t n = 0; n <= N; n++) {
+            log(STDERR, " %lu: %s", n, pretty_print(stov(stack_nth(st, n))));
         }
     }
 }

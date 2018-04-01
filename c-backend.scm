@@ -2,7 +2,9 @@
 (define-record-type c-env (fields cc flags includedir libdir output))
 
 (define (gcc-with-output o)
-  (make-c-env "gcc" (list "-g") "runtime/include" "runtime" o))
+  (make-c-env "gcc" (list "-g")
+              (list "runtime/include" "bdwgc-dist/include")
+              (list "runtime" "bdwgc-dist/lib") o))
 
 (define gcc-a-out (gcc-with-output "a.out"))
 
@@ -11,13 +13,16 @@
 
 (define (c-backend c-code opts)
   (let ([cmd
-          (format "~a -o ~a ~a -I~a -L~a -x c -include preamble.c - -lruntime"
+          (format "~a -static -o ~a ~a -lruntime -lgc -include preamble.c -x c -"
                   (c-env-cc opts)
                   (c-env-output opts)
-                  (mk-string " " (c-env-flags opts))
-                  (c-env-includedir opts)
-                  (c-env-libdir opts)
-                  )])
+                  (mk-string " "
+                    (append
+                      (c-env-flags opts)
+                            (map (lambda (d) (format "-I~a" d))
+                                 (c-env-includedir opts))
+                            (map (lambda (d) (format "-L~a" d))
+                                 (c-env-libdir opts)))))])
     (log-debug "execute: ~a" cmd)
     (log-trace-lines "c-code" (line-numbers c-code))
     (apply

@@ -1,4 +1,5 @@
 #include <stack.h>
+#include <mem.h>
 #include <common.h>
 
 #include <stddef.h>
@@ -30,14 +31,14 @@ struct stack {
 
 struct stack* stack_fresh()
 {
-    struct stack* st = (struct stack*)malloc(sizeof(*st)); assert(st);
+    struct stack* st = (struct stack*)my_malloc(sizeof(*st)); assert(st);
     st->sp = -1;
     st->fork = false;
 
     size_t block_size =
         sizeof(struct block) +
         STACK_NO_INITIAL_SLOTS * sizeof(struct slot);
-    struct block* b = st->block = (struct block*)calloc(block_size, 1);
+    struct block* b = st->block = (struct block*)my_calloc(block_size, 1);
     b->claimed = true;
     b->msp = st->sp;
     b->N = STACK_NO_INITIAL_SLOTS;
@@ -60,7 +61,7 @@ void stack_push(struct stack* st, struct stack_data data)
         if (sp0 != block->msp || block->claimed) {
             size_t block_size =
                 sizeof(struct block) + block->N * sizeof(struct slot);
-            st->block = (struct block*)calloc(block_size, 1);
+            st->block = (struct block*)my_calloc(block_size, 1);
             st->block->msp = sp0;
             st->block->N = block->N;
             memcpy(st->block->slots, block->slots,
@@ -115,7 +116,7 @@ struct stack* stack_fork(const struct stack* st)
 {
     if (st->sp == -1) return stack_fresh();
 
-    struct stack* tt = (struct stack*)malloc(sizeof(*tt)); assert(tt);
+    struct stack* tt = (struct stack*)my_malloc(sizeof(*tt)); assert(tt);
     tt->block = st->block;
     tt->sp = st->sp;
     tt->fork = true;

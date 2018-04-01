@@ -190,6 +190,21 @@ Examples
 ((number . 1))
 ```
 
+### Example: 15
+```scheme
+(system
+  ((init Main ()))
+  (define (Main)
+    (Init (send (self) 0))
+    (X (match (= X 100000)
+         [false (send (self) (+ X 1))]
+         [true (output success)]))))
+```
+#### Output
+```scheme
+((atom . success))
+```
+
 ### Example: arith
 ```scheme
 (system

@@ -5,6 +5,7 @@
 #include <value.h>
 #include <common.h>
 #include <stubs.h>
+#include <mem.h>
 
 struct cons {
     struct value car;
@@ -13,7 +14,7 @@ struct cons {
 
 struct value mk_cons(struct value v0, struct value v1)
 {
-    struct cons* c = (struct cons*)malloc(sizeof(*c)); assert(c);
+    struct cons* c = (struct cons*)my_malloc(sizeof(*c)); assert(c);
     c->car = v0;
     c->cdr = v1;
     return (struct value){.t=CONS,.v=(word_t)c};
@@ -135,7 +136,7 @@ const char* pretty_print(struct value v)
     do_put_lit(&p, &rem, "\0");
 
     size_t n = PRETTY_PRINT_BUF - rem;
-    p = malloc(n); assert(p);
+    p = my_malloc(n); assert(p);
     memcpy(p, buf, n);
     return p;
 }
