@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <common.h>
 #include <queue.h>
+#include <mem.h>
 
 struct queue {
     struct msg* head;
@@ -10,7 +11,8 @@ struct queue {
 
 struct queue* fresh_queue()
 {
-    return calloc(sizeof(struct queue), 1);
+    struct queue* q = my_calloc(sizeof(struct queue), 1); assert(q);
+    return q;
 }
 
 void enqueue(struct queue* q, struct msg* m)

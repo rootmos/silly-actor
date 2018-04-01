@@ -13,6 +13,8 @@ void __failwith(
     va_start(vl, fmt);
     fprintf(stderr, "%s:%s:%d: ", caller, file, line);
     vfprintf(stderr, fmt, vl);
+    fprintf(stderr, "\n");
+    fflush(stderr);
     va_end(vl);
 
     abort();

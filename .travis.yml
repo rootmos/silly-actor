@@ -1,4 +1,4 @@
 sudo: required
 services:
     - docker
-script: make docker
+script: make clean docker

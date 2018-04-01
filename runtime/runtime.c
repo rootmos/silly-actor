@@ -5,6 +5,7 @@
 #include <value.h>
 #include <runtime.h>
 #include <queue.h>
+#include <mem.h>
 
 #include <stdlib.h>
 
@@ -47,7 +48,7 @@ struct actor* current_actor()
 void initialize_system(struct system* s)
 {
     s->N = 100;
-    s->as = (struct actor**)calloc(sizeof(struct actor*), s->N);
+    s->as = (struct actor**)my_calloc(sizeof(struct actor*), s->N);
 
     s->q = fresh_queue();
     s->next_aid = SYS_ATOMS_END;
@@ -81,7 +82,7 @@ struct trampoline cont(struct value cl, struct value v)
 
 void send(actor_id to, struct value v)
 {
-    struct msg* m = (struct msg*)malloc(sizeof(*m));
+    struct msg* m = (struct msg*)my_malloc(sizeof(*m)); assert(m);
     m->to = to;
     m->from = s.current_aid;
     m->v = v;
@@ -91,7 +92,7 @@ void send(actor_id to, struct value v)
     debug("enqueued msg: %d -> %d, %s", m->from, m->to, pretty_print(v));
 }
 
-struct value sendM(struct value to, struct value data)
+struct value sendR(struct value to, struct value data)
 {
     send(cast_aid(to), data);
     return mk_nil();
@@ -117,22 +118,22 @@ struct trampoline value_error()
 }
 
 
-struct value fromM()
+struct value fromR()
 {
     return mk_aid(s.current_msg->from);
 }
 
-struct value msgM()
+struct value msgR()
 {
     return s.current_msg->v;
 }
 
-struct value parentM()
+struct value parentR()
 {
     return mk_aid(current_actor()->parent);
 }
 
-struct value equalM(struct value a, struct value b)
+struct value equalR(struct value a, struct value b)
 {
     if (eq(a, b)) {
         return ATOM_TRUE;
@@ -141,9 +142,18 @@ struct value equalM(struct value a, struct value b)
     }
 }
 
+struct value addR(struct value a, struct value b)
+{
+    if(a.t == NUMBER && b.t == NUMBER) {
+        return mk_number(a.v + b.v);
+    } else {
+        not_implemented();
+    }
+}
+
 struct actor* spawn(struct closure* cl, actor_id aid, struct value state)
 {
-    struct actor* a = (struct actor*)malloc(sizeof(*a));
+    struct actor* a = (struct actor*)my_malloc(sizeof(*a)); assert(a);
     a->aid = aid;
 
     a->cl = cl;
@@ -153,7 +163,7 @@ struct actor* spawn(struct closure* cl, actor_id aid, struct value state)
     insert_actor(a);
 }
 
-struct value spawnM(struct value cl, struct value state)
+struct value spawnR(struct value cl, struct value state)
 {
     actor_id aid = s.next_aid;
     s.next_aid += 1;
@@ -167,31 +177,31 @@ struct value spawnM(struct value cl, struct value state)
 }
 
 
-struct value stateM()
+struct value stateR()
 {
     return current_actor()->state;
 }
 
-struct value set_stateM(struct value state)
+struct value set_stateR(struct value state)
 {
    current_actor()->state = state;
    return mk_nil();
 }
 
-struct value set_clM(struct value cl)
+struct value set_clR(struct value cl)
 {
     current_actor()->cl = cast_cl(cl);
     return mk_nil();
 }
 
-struct value selfM()
+struct value selfR()
 {
     return (struct value){.t=ACTOR_ID,.v=(word_t)(s.current_aid)};
 }
 
 struct value make_closure(cl_t cl, struct stack* st)
 {
-    struct closure* c = (struct closure*)malloc(sizeof(*c));
+    struct closure* c = (struct closure*)my_malloc(sizeof(*c)); assert(c);
     c->f = cl;
     c->st = st;
     return (struct value){.t=CL,.v=(word_t)c};
@@ -199,15 +209,15 @@ struct value make_closure(cl_t cl, struct stack* st)
 
 struct trampoline output(struct stack* st, struct value v)
 {
-    dprintf(1, "%s", pretty_print(msgM()));
+    dprintf(1, "%s", pretty_print(msgR()));
     return yield();
 }
 
 struct closure* null_closure(cl_t f)
 {
-    struct closure* cl = (struct closure*)malloc(sizeof(*cl));
+    struct closure* cl = (struct closure*)my_malloc(sizeof(*cl)); assert(cl);
     cl->f = f;
-    cl->st = NULL;
+    cl->st = stack_fresh();
     return cl;
 }
 
@@ -215,7 +225,7 @@ void go(struct actor* a, struct closure* cl, struct value v)
 {
     struct trampoline t;
     while (true) {
-        t = (cl->f)(cl->st, v);
+        t = (cl->f)(stack_fork(cl->st), v);
         switch (t.a) {
         case MATCH_ERROR:
         case YIELD: return;
@@ -229,6 +239,8 @@ void go(struct actor* a, struct closure* cl, struct value v)
     }
 }
 
+#include <linux/unistd.h>
+
 int main()
 {
     set_log_level();
@@ -240,11 +252,11 @@ int main()
     spawn(null_closure(output), SYS_OUTPUT, mk_nil());
 
     while(dequeue(s.q, &s.current_msg)) {
-        struct actor* a = fetch_actor(s.current_msg->to);
         debug("processing msg: %d -> %d, %s",
              s.current_msg->from,
              s.current_msg->to,
              pretty_print(s.current_msg->v));
+        struct actor* a = fetch_actor(s.current_msg->to);
         s.current_aid = a->aid;
         go(a, a->cl, mk_nil());
     }

@@ -10,12 +10,12 @@ stack_test: stack.test.o common.o tests.o
 	./$@
 
 %.o: %.c
-	gcc $(CC_OPTS) -Iinclude -c $<
+	gcc $(CC_OPTS) -I../bdwgc-dist/include -Iinclude -c $<
 
 %.test.o: %.c
 	gcc -DTEST -Iinclude -o $@ -c $<
 
 clean:
-	rm -f *.o *_test
+	rm -f *.o *_test *.a
 
 .PHONY: tests clean

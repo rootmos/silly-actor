@@ -13,6 +13,7 @@
     (set-cl! 1 set-clM)
     (yield 0 yieldM)
     (= 2 equalM)
+    (+ 2 addM)
     ))
 
 (define syntactic-sugar '(become stay output reply))
@@ -423,7 +424,7 @@
         ,(cons 'list  (map ActorDef ad*)))]))
 
 (define-language
-  Lstack
+  Lde-bruijn
   (extends Lmonad)
   (terminals
     (- (anf-val (av)))
@@ -446,7 +447,7 @@
   (Options (o)
     (- (init bv v)) (+ (init n v))))
 
-(define-pass to-stack : Lmonad (l) -> Lstack ()
+(define-pass de-bruijn : Lmonad (l) -> Lde-bruijn ()
   (Value : Value (v ctx) -> Value ()
     [(anf-val ,av) `(slot ,(index av ctx))])
   (Pattern : Pattern (p ctx) -> Pattern (ctx)
@@ -499,134 +500,282 @@
             [o*^ (map (lambda (o) (Options o ctx^)) o*)])
        `(system (,o*^ ...) ,ad*^ ...))]))
 
-(define-pass output-c : Lstack (l) -> * ()
+(define (closure? x)
+  (and
+    [symbol? x]
+    [>= (string-length (symbol->string x)) 3]
+    [equal? (substring (symbol->string x) 0 3) "cl_"]
+    ))
+
+(define monadfun-to-runtimefun
+  '((stopM stopR)
+    (spawnM spawnR)
+    (sendM sendR)
+    (fromM fromR)
+    (msgM msgR)
+    (parentM parentR)
+    (stateM stateR)
+    (selfM selfR)
+    (set-stateM set_stateR)
+    (set-clM set_clR)
+    (equalM equalR)
+    (addM addR)
+    ))
+
+(define (runtimefun? x) (list? (member x (map cadr monadfun-to-runtimefun))))
+
+(define-language
+  Lstack
+  (terminals
+    (number (n))
+    (runtimefun (rf))
+    (sys (s))
+    (atom (a))
+    (closure (cl)))
+  (entry System)
+  (Value (v)
+    (nil)
+    (number n)
+    (nth n)
+    (car v)
+    (cdr v)
+    (cons v0 v1)
+    (arg)
+    (sys s)
+    (atom a))
+  (Expr (e)
+    v
+    rf
+    (rf v* ...)
+    (closure-ref cl))
+  (Cond (c)
+    (true)
+    (eq v0 v1)
+    (and c0 c1)
+    (is-cons v))
+  (CondArm (ca) (c st))
+  (Statement (st)
+    (push e)
+    (discard e)
+    (yield)
+    (match-error v)
+    (continue v0 v1)
+    (cond ca* ...)
+    (and_then st0 st1))
+  (Closure (closure)
+    (nullary cl st)
+    (unary cl st))
+  (System (syst)
+    (system (closure* ...) st)))
+
+(define-pass to-stack : Lde-bruijn (l) -> Lstack ()
   (definitions
-    (define (indent n)
-      (string-append "\n" (mk-string "" (map (lambda (_) "  ") (iota n)))))
-    (define yield "return yield()")
-    (define (match_error v) (format "return match_error(~A)" v))
-    (define (continue k v) (format "return cont(~A,~A)" k v))
-    (define (push v) (format "push(~A)" v))
-    (define (nth n) (format "nth(~D)" n))
-    (define (car^ v) (format "car(~A)" v))
-    (define (cdr^ v) (format "cdr(~A)" v))
-    (define (is_cons v) (format "is_cons(~A)" v))
-    (define (eq^ v w) (format "eq(~A, ~A)" v w))
-    (define (mk_sys s) (format "mk_sys(~A)" (string-upcase (symbol->string s))))
-    (define (mk_number n) (format "mk_number(~D)" n))
-    (define mk_null "mk_nil()")
-    (define mk_true "true")
-    (define (mk_atom a) (format "mk_atom(~D)" (internalize-atom a)))
-    (define (mk_cons v0 v1) (format "mk_cons(~A,~A)" v0 v1))
-
-    (define var-counter 0)
-    (define (fresh-var)
-      (let* ([c var-counter] [v (format "var_~s" c)])
-        (set! var-counter (+ c 1)) v))
-
     (define cl-counter 0)
     (define cls '())
-    (define (close k)
-      (let* ([c cl-counter] [cl (format "cl_~s" c)] [v (fresh-var)])
-        (set! cl-counter (+ c 1))
-        (set! cls (cons (format "define_closure(~A,~A)~a~A;~nend_closure()"
-                                cl v (indent 1) (k v)) cls))
-        (format "mk_cl(~A)" cl)))
+    (with-output-language (Lstack Value)
+      (define mk-nil `(nil))
+      (define mk-arg `(arg))
+      (define (mk-nth n) `(nth ,n))
+      (define (car^ v) `(car ,v))
+      (define (cdr^ v) `(cdr ,v))
+      )
+    (with-output-language (Lstack Expr)
+      (define (mk-cl cl) `(closure-ref ,cl)))
+    (with-output-language (Lstack CondArm)
+      (define (match-error-arm v)
+        `((true) (match-error ,v))))
+    (with-output-language (Lstack Closure)
+      (define (close k arity)
+        (let* ([c cl-counter] [cl (string->symbol (format "cl_~s" c))])
+          (set! cl-counter (+ c 1))
+          (set! cls (cons (case arity
+                            [0 `(nullary ,cl ,(k mk-nil))]
+                            [1 `(unary ,cl ,(k mk-arg))])
+                          cls))
+          (mk-cl cl)))))
+  (Value : Value (r) -> Value ()
+    [(slot ,n) `(nth ,n)]
+    [,null `(nil)])
+  (Pattern : Pattern (p v) -> Cond (bs)
+    [(cons ,p0 ,p1)
+     (let-values
+       ([(cs0 bs0) (Pattern p0 (car^ v))]
+        [(cs1 bs1) (Pattern p1 (cdr^ v))])
+       (values `(and (is-cons ,v) (and ,cs0 ,cs1)) (append bs1 bs0)))]
+    [(bind) (values `(true) (list v))]
+    [(slot ,n) (values `(eq ,v (nth ,n)) '())]
+    [(sys ,s) (values `(eq ,v (sys ,s)) '())]
+    [(atom ,a) (values `(eq ,v (atom ,a)) '())]
+    [(number ,n) (values `(eq ,v (number ,n)) '())]
+    [,null (values `(eq ,v (nil)) '())]
+    [,wp (values `(true) '())])
+  (MatchArm : MatchArm (ma v) -> CondArm ()
+    [(,p ,e)
+     (let-values ([(cs bs) (Pattern p v)])
+      `(,cs
+         ,(let go ([bs^ bs])
+             (case bs^
+               ['() (Expr e (lambda (w) w))]
+               [else `(and_then (push ,(car bs^)) ,(go (cdr bs^)))]))))])
+  (Expr : Expr (e k) -> Statement ()
+    [(point ,v) (k (Value v))]
+    [(match ,v ,ma* ...)
+     (let ([arms (append (map (lambda (ma) (MatchArm ma (Value v))) ma*)
+                         (list (match-error-arm (Value v))))])
+       `(cond ,arms ...))]
+    [,mf
+      (cond
+        [(eq? mf 'yieldM) `(yield)]
+        [(assv mf monadfun-to-runtimefun)
+         => (lambda (l)
+              (k (with-output-language (Lstack Expr) `,(cadr l))))]
+        [else (error 'output-c "malformed monadfun to runtimefun conversion"
+                     (unparse-Lde-bruijn e))])]
+    [(,mf ,v* ...)
+      (cond
+        [(assv mf monadfun-to-runtimefun)
+         => (lambda (l)
+              (k (with-output-language (Lstack Expr)
+                   `(,(cadr l) ,(map Value v*) ...))))]
+        [else (error 'output-c "malformed monadfun to runtimefun conversion"
+                     (unparse-Lde-bruijn e))])]
+    [(continue ,n ,v) `(continue (nth ,n) ,(Value v))]
+    [(close ,e)
+     (k (close (lambda (_) (Expr e (lambda (v) `(discard ,v)))) 0))]
+    [(>>= ,e0 ,e1) (Expr e0 (lambda (z) `(and_then (push ,z) ,(Expr e1 k))))]
+    [(with/cc ,e)
+     `(and_then (push ,(close k 1)) ,(Expr e (lambda (w) `(discard ,w))))])
+  (ActorDef : ActorDef (ad) -> Statement ()
+    [(define ,e)
+     `(push ,(close
+               (lambda (_)
+                 (Expr e (lambda (w)
+                           (with-output-language (Lstack Statement)
+                                                      `(discard ,w))))) 0))])
+  (Options : Options (o) -> Statement ()
+    [(init ,n ,v) `(discard (spawnR ,(list (mk-nth n) (Value v)) ...))])
+  (System : System (syst) -> System ()
+    [(system (,o* ...) ,ad* ...)
+     (let ([as (let go ([sts (append (map ActorDef ad*) (map Options o*))])
+                 (cond
+                   [(null? (cdr sts)) (car sts)]
+                   [else (with-output-language (Lstack Statement)
+                           `(and_then ,(car sts) ,(go (cdr sts))))]))])
+       `(system (,(reverse cls) ...) ,as))]))
 
+(define-language
+  Lstack-with-atom-defs
+  (extends Lstack)
+  (terminals
+    (+ (string (str)))
+    (- (atom (a))))
+  (Value (v)
+    (- (atom a))
+    (+ (atom n)))
+  (AtomDef (ad)
+    (+ (n str)))
+  (System (syst)
+    (- (system (closure* ...) st))
+    (+ (system (ad* ...) (closure* ...) st))))
+
+(define predefined-atoms '(true false))
+(define (hash-atom a) (symbol-hash a))
+
+(define-pass collect-atoms : Lstack (l) -> Lstack-with-atom-defs ()
+  (definitions
     (define atoms (make-eq-hashtable))
     (define (internalize-atom a)
       (or (hashtable-ref atoms a #f)
           (begin
-            (let ([hash (symbol-hash a)])
-              (hashtable-set! atoms a hash)
-              hash))))
-
-    (define (mk-predefined-atoms)
-      (mk-string "" (map (lambda (a) (format "predefined_atom(~a,~a);"
-                                             (string-upcase (symbol->string a))
-                                             (mk_atom a)))
-                         '(true false))))
-
-    (define output-atoms-lookup
-      (lambda ()
+            (let ([hash (hash-atom a)])
+              (hashtable-set! atoms a hash) hash))))
+    (with-output-language (Lstack-with-atom-defs AtomDef)
+      (define (mk-atom-defs)
+        (for-each internalize-atom predefined-atoms)
         (let-values ([(keys vals) (hashtable-entries atoms)])
-          (format "atoms_begin() ~A atoms_end()"
-            (mk-string " "
-              (let go ([ks (vector->list keys)] [vs (vector->list vals)] [acc '()])
-                (cond
-                  [(pair? ks)
-                   (go (cdr ks) (cdr vs)
-                       (cons
-                         (format "atoms_entry(~a,\"~a\")" (car vs) (car ks))
-                         acc))]
-                  [else acc]))))))))
-  (Value : Value (v) -> * ()
-    [(slot ,n) (nth n)]
-    [(sys ,s) (mk_sys s)]
-    [(number ,n) (mk_number n)]
-    [(atom ,a) (mk_atom a)]
-    [(cons ,v0 ,v1) (mk_cons (Value v0) (Value v1))]
-    [,null mk_null])
-  (Pattern : Pattern (p v) -> * (bs)
-    [(cons ,p0 ,p1)
-     (let-values ([(cs0 bs0) (Pattern p0 (car^ v))]
-                  [(cs1 bs1) (Pattern p1 (cdr^ v))])
-       (values (cons (is_cons v) (append cs1 cs0)) (append bs1 bs0)))]
-    [(bind) (values (list mk_true) (list (push v)))]
-    [(slot ,n) (values (list (eq^ v (nth n))) '())]
-    [(sys ,s) (values (list (eq^ v (mk_sys s))) '())]
-    [(number ,n) (values (list (eq^ v (mk_number n))) '())]
-    [(atom ,a) (values (list (eq^ v (mk_atom a))) '())]
-    [,null (values (list (eq^ v mk_null)) '())]
-    [,wp (values (list mk_true) '())])
-  (MatchArm : MatchArm (ma v) -> * ()
-    [(,p ,e)
-     (let-values ([(cs bs) (Pattern p v)])
-       (format "if(~A) {~a~A;~a~A;~a} else"
-               (mk-string "&&" cs)
-               (indent 2)
-               (mk-string ";" bs)
-               (indent 2)
-               (Expr e (lambda (w) w))
-               (indent 1)
-               ))])
-  (Expr : Expr (e k) -> * ()
-    [(match ,v ,ma* ...)
-     (format "~A {~a~A;~a}"
-       (mk-string " " (map (lambda (ma) (MatchArm ma (Value v))) ma*))
-       (indent 2) (match_error (Value v)) (indent 1))]
-    [(point ,v) (k (Value v))]
-    [,mf
-      (case mf
-        ['yieldM yield]
-        [else (k (format "~A()" mf))])]
-    [(close ,e) (k (close (lambda (v) (Expr e (lambda (v) v)))))]
-    [(,mf ,v* ...)
-     (k (format "~A(~A)" (case mf
-                           ['set-stateM 'set_stateM]
-                           ['set-clM 'set_clM]
-                           [else mf])
-                (mk-string "," (map Value v*))))]
-    [(>>= ,e0 ,e1)
-     (Expr e0
-       (lambda (w) (format "~A;~a~A" (push w) (indent 1) (Expr e1 k))))]
-    [(continue ,n ,v) (continue (nth n) (Value v))]
-    [(with/cc ,e) (format "~A;~a~A" (push (close k)) (indent 1)
-                          (Expr e (lambda (w) w)))])
-  (ActorDef : ActorDef (ad) -> * ()
-    [(define ,e) (push (close (lambda (_) (Expr e (lambda (v) v)))))])
-  (Options : Options (o) -> * ()
-    [(init ,n ,v) (format "spawnM(~a,~a)" (nth n) (Value v))])
+          (let go ([ks (vector->list keys)] [vs (vector->list vals)] [acc '()])
+            (cond
+              [(pair? ks)
+               (go (cdr ks) (cdr vs)
+                   (cons `(,(car vs) ,(symbol->string (car ks))) acc))]
+              [else acc]))))))
+  (Value : Value (v) -> Value ()
+    [(atom ,a) `(atom ,(internalize-atom a))])
+  (Statement : Statement (st) -> Statement ())
+  (Closure : Closure (cl) -> Closure ())
+  (System : System (syst) -> System ()
+    [(system (,closure* ...) ,st)
+     (let ([cl* (map Closure closure*)] [st^ (Statement st)])
+       `(system (,(mk-atom-defs) ...) (,cl* ...) ,st^))]))
+
+(define-pass output-c : Lstack-with-atom-defs (l) -> * ()
+  (definitions
+    (define unusable-arg
+      (lambda () (error 'output-c "used argument in nullary closure")))
+    (define var-counter 0)
+    (define (fresh-var)
+      (let* ([c var-counter] [v (format "var_~s" c)])
+        (set! var-counter (+ c 1)) v)))
+  (Value : Value (v arg) -> * ()
+    [(arg) (arg)]
+    [(atom ,n) (format "mk_atom(~d)" n)]
+    [(number ,n) (format "mk_number(~d)" n)]
+    [(nth ,n) (format "nth(~d)" n)]
+    [(car ,v) (format "car(~d)" (Value v arg))]
+    [(cdr ,v) (format "cdr(~d)" (Value v arg))]
+    [(cons ,v0 ,v1)
+     (format "mk_cons(~a,~a)" (Value v0 arg) (Value v1 arg))]
+    [(nil) "mk_nil()"]
+    [(sys ,s) (format "mk_sys(~A)" (string-upcase (symbol->string s)))])
+  (Expr : Expr (e arg) -> * ()
+    [,v (Value v arg)]
+    [,rf (format "~A()" rf)]
+    [(,rf ,v* ...)
+     (format "~A(~A)" rf (mk-string "," (map (lambda (v) (Value v arg)) v*)))]
+    [(closure-ref ,cl) (format "mk_cl(~a)" cl)])
+  (Cond : Cond (c arg) -> * ()
+    [(true) "true"]
+    [(eq ,v0 ,v1) (format "eq(~a,~a)" (Value v0 arg) (Value v1 arg))]
+    [(and ,c0 ,c1) (format "~a && ~a" (Cond c0 arg) (Cond c1 arg))]
+    [(is-cons ,v) (format "is_cons(~a)" (Value v arg))])
+  (CondArm : CondArm (ca arg) -> * ()
+    [(,c ,st) (values (Cond c arg) (Statement st arg))])
+  (Statement : Statement (st arg) -> * ()
+    [(push ,e) (format "push(~a)" (Expr e arg))]
+    [(discard ,e) (Expr e arg)]
+    [(yield) "return yield()"]
+    [(match-error ,v) (format "return match_error(~A)" (Value v arg))]
+    [(continue ,v0 ,v1)
+     (format "return cont(~A,~A)" (Value v0 arg) (Value v1 arg))]
+    [(cond ,ca* ...)
+     (let go ([cas ca*])
+       (let-values ([(c st) (CondArm (car cas) arg)])
+         (cond
+           [(null? (cdr cas)) (format "if(~a){~a;}" c st)]
+           [else (format "if(~a){~a;}else ~a" c st (go (cdr cas)))])))]
+    [(and_then ,st0 ,st1)
+     (format "~a;~a" (Statement st0 arg) (Statement st1 arg))])
+  (Closure : Closure (c) -> * ()
+    [(unary ,cl ,st)
+     (let ([arg (fresh-var)])
+       (format "define_unary_closure(~A,~A)~A;end_closure();"
+               cl arg (Statement st (lambda () arg))))]
+    [(nullary ,cl ,st)
+     (let ([arg (fresh-var)])
+       (format "define_nullary_closure(~A)~A;end_closure();"
+               cl (Statement st unusable-arg)))])
+  (AtomDef : AtomDef (ad) -> * ()
+    [(,n ,str) (format "atoms_entry(~a,\"~a\")" n str)])
   (System : System (s) -> * ()
-    [(system (,o* ...) ,ad* ...)
-     (let ([as (mk-string (string-append ";" (indent 1)) (map ActorDef ad*))]
-           [pa (mk-predefined-atoms)])
-       (format "~A~n~A~n~A~ndefine_system()~a~A;~a~A;~nend_system()"
-               (output-atoms-lookup)
-               pa
-               (mk-string "\n" (reverse cls))
-               (indent 1)
-               as
-               (indent 1)
-               (mk-string (string-append ";" (indent 1)) (map Options o*))
-               ))]))
+    [(system (,ad* ...) (,closure* ...) ,st)
+     (let ([s (list (format "define_system() ~a; end_system();"
+                            (Statement st unusable-arg)))]
+           [p (map (lambda (a) (format "predefined_atom(~a,~a);"
+                                             (string-upcase (symbol->string a))
+                                             (hash-atom a)))
+                     predefined-atoms)]
+           [as (list (format "atoms_begin() ~a atoms_end()"
+                             (fold-left string-append "" (map AtomDef ad*))))]
+           [cls (map Closure closure*)]
+           )
+       (fold-left string-append "" (append p as cls s)))]))

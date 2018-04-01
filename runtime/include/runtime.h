@@ -21,17 +21,18 @@ struct trampoline cont(struct value cl, struct value v);
 struct trampoline match_error(struct value v);
 struct trampoline value_error();
 
-struct value fromM();
-struct value parentM();
-struct value msgM();
-struct value sendM(struct value to, struct value msg);
-struct value spawnM(struct value cl, struct value state);
-struct value stateM();
-struct value selfM();
-struct value set_stateM(struct value state);
-struct value set_clM(struct value cl);
+struct value fromR();
+struct value parentR();
+struct value msgR();
+struct value sendR(struct value to, struct value msg);
+struct value spawnR(struct value cl, struct value state);
+struct value stateR();
+struct value selfR();
+struct value set_stateR(struct value state);
+struct value set_clR(struct value cl);
 
-struct value equalM(struct value a, struct value b);
+struct value equalR(struct value a, struct value b);
+struct value addR(struct value a, struct value b);
 
 typedef struct trampoline (*cl_t)(struct stack*, struct value);
 

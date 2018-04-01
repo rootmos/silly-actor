@@ -25,8 +25,8 @@ void print_stack(const struct stack* st)
         log(STDERR, "stack empty");
     } else {
         log(STDERR, "stack:");
-        for (size_t n = 0; n <= stack_height(st); n++) {
-            log(STDERR, " %u: %s", n, pretty_print(stov(stack_nth(st, n))));
+        for (size_t n = 0; n <= N; n++) {
+            log(STDERR, " %lu: %s", n, pretty_print(stov(stack_nth(st, n))));
         }
     }
 }
@@ -39,9 +39,14 @@ void print_stack(const struct stack* st)
 
 #define str(s) #s
 
-#define define_closure(cl,v) \
+#define define_unary_closure(cl,v) \
     struct trampoline cl(struct stack* st, struct value v) { \
         debug("in "str(cl)"(%s)", pretty_print(v)); \
+        if(log_level >= TRACE) { print_stack(st); }
+
+#define define_nullary_closure(cl) \
+    struct trampoline cl(struct stack* st, struct value _) { \
+        debug("in "str(cl)"()"); \
         if(log_level >= TRACE) { print_stack(st); }
 
 #define end_closure() return yield(); }
@@ -54,4 +59,4 @@ void print_stack(const struct stack* st)
 
 #define mk_cl(cl) make_closure(cl, stack_fork(st))
 
-#define predefined_atom(a,v) struct value ATOM_##a = v
+#define predefined_atom(a,v) struct value ATOM_##a = mk_atom(v)

@@ -1,0 +1,7 @@
+(system
+  [(init Main ())]
+  (define (Main)
+    [_ (seq
+         (output (+ 1 2))
+         (output (+ 0 7)))]))
+  

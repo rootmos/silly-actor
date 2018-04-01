@@ -4,3 +4,6 @@
 [submodule "thunderchez"]
 	path = thunderchez
 	url = https://github.com/ovenpasta/thunderchez
+[submodule "bdwgc"]
+	path = bdwgc
+	url = git://github.com/ivmai/bdwgc.git

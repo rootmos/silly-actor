@@ -1,7 +1,7 @@
 (library (runtime)
   (export >>= point
           stateM msgM fromM selfM set-stateM set-clM parentM
-          equalM
+          equalM addM
           lookupM matchM closeM
           spawnM sendM stopM
           with/ccM continueM yieldM
@@ -82,6 +82,10 @@
     (lambda (ctx env)
       (values (if (equal? a b) '(atom . true) '(atom . false)) env)))
 
+  (define (addM a b)
+    (lambda (ctx env)
+      (values (cons 'number (+ (cdr a) (cdr b))) env))) ; TODO: type errors
+
   (define (with/ccM kv m)
     (lambda (ctx env)
       (values (call/cc (lambda (k) (m ctx (cons (cons kv k) env)))) env)))
@@ -112,8 +116,8 @@
       [(and (pair? p) (eqv? (car p) 'var))
        (cond [(equal? x (lookup (cdr p) env)) env]
              [else #f])]
-      [(and (list? p) (eqv? (car p) 'cons)
-            (list? x) (eqv? (car x) 'cons))
+      [(and (pair? p) (eqv? (car p) 'cons)
+            (pair? x) (eqv? (car x) 'cons))
        (cond
          [(match (cadr x) (cadr p) env) =>
           (lambda (e) (match (caddr x) (caddr p) e))]
