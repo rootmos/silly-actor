@@ -13,6 +13,7 @@
     (set-cl! 1 set-clM)
     (yield 0 yieldM)
     (= 2 equalM)
+    (+ 2 addM)
     ))
 
 (define syntactic-sugar '(become stay output reply))
@@ -518,6 +519,7 @@
     (set-stateM set_stateR)
     (set-clM set_clR)
     (equalM equalR)
+    (addM addR)
     ))
 
 (define (runtimefun? x) (list? (member x (map cadr monadfun-to-runtimefun))))

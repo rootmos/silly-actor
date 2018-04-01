@@ -141,6 +141,15 @@ struct value equalR(struct value a, struct value b)
     }
 }
 
+struct value addR(struct value a, struct value b)
+{
+    if(a.t == NUMBER && b.t == NUMBER) {
+        return mk_number(a.v + b.v);
+    } else {
+        not_implemented();
+    }
+}
+
 struct actor* spawn(struct closure* cl, actor_id aid, struct value state)
 {
     struct actor* a = (struct actor*)malloc(sizeof(*a));

@@ -32,6 +32,7 @@ struct value set_stateR(struct value state);
 struct value set_clR(struct value cl);
 
 struct value equalR(struct value a, struct value b);
+struct value addR(struct value a, struct value b);
 
 typedef struct trampoline (*cl_t)(struct stack*, struct value);
 

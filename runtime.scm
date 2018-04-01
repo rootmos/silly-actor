@@ -1,7 +1,7 @@
 (library (runtime)
   (export >>= point
           stateM msgM fromM selfM set-stateM set-clM parentM
-          equalM
+          equalM addM
           lookupM matchM closeM
           spawnM sendM stopM
           with/ccM continueM yieldM
@@ -81,6 +81,10 @@
   (define (equalM a b)
     (lambda (ctx env)
       (values (if (equal? a b) '(atom . true) '(atom . false)) env)))
+
+  (define (addM a b)
+    (lambda (ctx env)
+      (values (cons 'number (+ (cdr a) (cdr b))) env))) ; TODO: type errors
 
   (define (with/ccM kv m)
     (lambda (ctx env)

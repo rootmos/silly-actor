@@ -168,6 +168,17 @@ Examples
 ((sys . Init))
 ```
 
+### Example: arith
+```scheme
+(system
+  ((init Main ()))
+  (define (Main) (_ (seq (output (+ 1 2)) (output (+ 0 7))))))
+```
+#### Output
+```scheme
+((number . 3) (number . 7))
+```
+
 ### Example: eq
 ```scheme
 (system
