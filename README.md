@@ -168,6 +168,28 @@ Examples
 ((sys . Init))
 ```
 
+### Example: 14
+```scheme
+(system
+  ((init Main ()))
+  (define (Counter)
+    (poke (stay (+ (state) 1)))
+    (tell (output (state)))
+    (_ ()))
+  (define (Main)
+    (Init
+      (let ([Id (spawn Counter 0)])
+        (match (send Id poke)
+          [1 (output whoops)]
+          [2 (output whoops)]
+          [(A B) (output whoops)]
+          [() (send Id tell)])))))
+```
+#### Output
+```scheme
+((number . 1))
+```
+
 ### Example: arith
 ```scheme
 (system

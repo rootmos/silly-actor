@@ -116,8 +116,8 @@
       [(and (pair? p) (eqv? (car p) 'var))
        (cond [(equal? x (lookup (cdr p) env)) env]
              [else #f])]
-      [(and (list? p) (eqv? (car p) 'cons)
-            (list? x) (eqv? (car x) 'cons))
+      [(and (pair? p) (eqv? (car p) 'cons)
+            (pair? x) (eqv? (car x) 'cons))
        (cond
          [(match (cadr x) (cadr p) env) =>
           (lambda (e) (match (caddr x) (caddr p) e))]
