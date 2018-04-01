@@ -11,11 +11,18 @@
                  to-monad
                  match-conts))
 
-(define (compile x)
-  (fold-left (lambda (x f) ((eval f) x)) x passes))
+(define interpreter-passes '(output-scheme))
+
+(define backend-passes '(de-bruijn
+                         to-stack
+                         collect-atoms
+                         output-c))
+
+(define (compile x second-phase)
+  (fold-left (lambda (x f) ((eval f) x)) x (append passes second-phase)))
 
 (define (interpret x)
-  (let ([code (output-scheme (compile x))])
+  (let ([code (compile x interpreter-passes)])
     (eval code (environment '(scheme) '(runtime)))))
 
 (define utf-8-transcoder
@@ -36,13 +43,7 @@
         [else (go (string-append acc l "\n"))]))))
 
 (define (run-c code output)
-  (pretty-print
-    (unparse-Lstack-with-atom-defs
-      (collect-atoms
-        (to-stack
-          (de-bruijn
-            (compile code))))))
-  (let ([c-code (output-c (de-bruijn (compile code)))])
+  (let ([c-code (compile code backend-passes)])
     (assert (c-backend c-code (gcc-with-output output)))
     (let-values ([(to-stdin from-stdout from-stderr pid)
                   (open-process-ports output 'line utf-8-transcoder)])
