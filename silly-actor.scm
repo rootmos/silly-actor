@@ -506,42 +506,58 @@
     [equal? (substring (symbol->string x) 0 3) "cl_"]
     ))
 
+(define monadfun-to-runtimefun
+  '((stopM stopR)
+    (spawnM spawnR)
+    (sendM sendR)
+    (fromM fromR)
+    (msgM msgR)
+    (parentM parentR)
+    (stateM stateR)
+    (selfM selfR)
+    (set-stateM set_stateR)
+    (set-clM set_clR)
+    (equalM equalR)
+    ))
+
+(define (runtimefun? x) (list? (member x (map cadr monadfun-to-runtimefun))))
+
 (define-language
   Lstack
   (terminals
     (number (n))
-    (monadfun (mf))
+    (runtimefun (rf))
     (sys (s))
     (atom (a))
     (closure (cl)))
   (entry System)
-  (Value (v)
+  (Rvalue (rv)
     (nil)
     (number n)
     (nth n)
-    (car v)
-    (cdr v)
-    (cons v0 v1)
-    mf ; TODO: can have side-effects
-    (mf v* ...)
+    (car rv)
+    (cdr rv)
+    (cons rv0 rv1)
+    rf
+    (rf rv* ...)
     (arg)
     (sys s)
     (atom a)
     (closure-ref cl))
   (Cond (c)
     (true)
-    (eq v0 v1)
+    (eq rv0 rv1) ; rv's can have side-effects, use temp-vars
     (and c0 c1)
-    (is-cons v))
+    (is-cons rv))
   (CondArm (ca) (c st))
   (Statement (st)
-    (push v)
+    (push rv)
     (yield)
-    (match-error v)
-    (continue v0 v1)
+    (match-error rv)
+    (continue rv0 rv1)
     (cond ca* ...)
     (and_then st0 st1)
-    (discard v)
+    (discard rv)
     )
   (Closure (closure)
     (nullary cl st)
@@ -553,14 +569,14 @@
   (definitions
     (define cl-counter 0)
     (define cls '())
-    (with-output-language (Lstack Value)
+    (with-output-language (Lstack Rvalue)
       (define mk-nil `(nil))
       (define mk-arg `(arg))
       (define (mk-nth n) `(nth ,n))
       (define (mk-cl cl) `(closure-ref ,cl)))
     (with-output-language (Lstack CondArm)
-      (define (match-error-arm v)
-        `((true) (match-error ,v))))
+      (define (match-error-arm rv)
+        `((true) (match-error ,rv))))
     (with-output-language (Lstack Closure)
       (define (close k arity)
         (let* ([c cl-counter] [cl (string->symbol (format "cl_~s" c))])
@@ -570,41 +586,57 @@
                             [1 `(unary ,cl ,(k mk-arg))])
                           cls))
           (mk-cl cl)))))
-  (Value : Value (v) -> Value ()
+  (Rvalue : Value (rv) -> Rvalue ()
     [(slot ,n) `(nth ,n)]
     [,null `(nil)])
-  (Pattern : Pattern (p v) -> Cond (bs)
+  (Pattern : Pattern (p rv) -> Cond (bs)
     [(cons ,p0 ,p1)
      (let-values
-       ([(cs0 bs0) (Pattern p0 (with-output-language (Lstack Value) `(car ,v)))]
-        [(cs1 bs1) (Pattern p1 (with-output-language (Lstack Value) `(cdr ,v)))])
-       (values `(and (is-cons ,v) (and ,cs0 ,cs1)) (append bs1 bs0)))]
-    [(bind) (values `(true) (list v))]
-    [(slot ,n) (values `(eq ,v (nth ,n)) '())]
-    [(sys ,s) (values `(eq ,v (sys ,s)) '())]
-    [(atom ,a) (values `(eq ,v (atom ,a)) '())]
-    [(number ,n) (values `(eq ,v (number ,n)) '())]
-    [,null (values `(eq ,v (nil)) '())]
+       ([(cs0 bs0) (Pattern p0 (with-output-language (Lstack Rvalue)
+                                                    `(car ,rv)))]
+        [(cs1 bs1) (Pattern p1 (with-output-language (Lstack Rvalue)
+                                                     `(cdr ,rv)))])
+       (values `(and (is-cons ,rv) (and ,cs0 ,cs1)) (append bs1 bs0)))]
+    [(bind) (values `(true) (list rv))]
+    [(slot ,n) (values `(eq ,rv (nth ,n)) '())]
+    [(sys ,s) (values `(eq ,rv (sys ,s)) '())]
+    [(atom ,a) (values `(eq ,rv (atom ,a)) '())]
+    [(number ,n) (values `(eq ,rv (number ,n)) '())]
+    [,null (values `(eq ,rv (nil)) '())]
     [,wp (values `(true) '())])
-  (MatchArm : MatchArm (ma v) -> CondArm ()
+  (MatchArm : MatchArm (ma rv) -> CondArm ()
     [(,p ,e)
-     (let-values ([(cs bs) (Pattern p (Value v))])
+     (let-values ([(cs bs) (Pattern p rv)])
       `(,cs
          ,(let go ([bs^ bs])
              (case bs^
                ['() (Expr e (lambda (w) w))]
                [else `(and_then (push ,(car bs^)) ,(go (cdr bs^)))]))))])
   (Expr : Expr (e k) -> Statement ()
-    [(point ,v) (k (Value v))]
+    [(point ,v) (k (Rvalue v))]
     [(match ,v ,ma* ...)
-     (let ([arms (append (map (lambda (ma) (MatchArm ma v)) ma*)
-                         (list (match-error-arm (Value v))))])
+     (let ([arms (append (map (lambda (ma) (MatchArm ma (Rvalue v))) ma*)
+                         (list (match-error-arm (Rvalue v))))])
        `(cond ,arms ...))]
-    [,mf (k (with-output-language (Lstack Value) `,mf))]
+    [,mf
+      (cond
+        [(eq? mf 'yieldM) `(yield)]
+        [(assv mf monadfun-to-runtimefun)
+         => (lambda (l)
+              (k (with-output-language (Lstack Rvalue) `,(cadr l))))]
+        [else (error 'output-c "malformed monadfun to runtimefun conversion"
+                     (unparse-Lde-bruijn e))])]
     [(,mf ,v* ...)
-     (k (with-output-language (Lstack Value) `(,mf ,(map Value v*) ...)))]
-    [(continue ,n ,v) `(continue (nth ,n) ,(Value v))]
-    [(close ,e) (k (close (lambda (_) (Expr e (lambda (v) `(discard ,v)))) 0))]
+      (cond
+        [(assv mf monadfun-to-runtimefun)
+         => (lambda (l)
+              (k (with-output-language (Lstack Rvalue)
+                   `(,(cadr l) ,(map Rvalue v*) ...))))]
+        [else (error 'output-c "malformed monadfun to runtimefun conversion"
+                     (unparse-Lde-bruijn e))])]
+    [(continue ,n ,v) `(continue (nth ,n) ,(Rvalue v))]
+    [(close ,e)
+     (k (close (lambda (_) (Expr e (lambda (rv) `(discard ,rv)))) 0))]
     [(>>= ,e0 ,e1) (Expr e0 (lambda (z) `(and_then (push ,z) ,(Expr e1 k))))]
     [(with/cc ,e)
      `(and_then (push ,(close k 1)) ,(Expr e (lambda (w) `(discard ,w))))])
@@ -616,7 +648,7 @@
                            (with-output-language (Lstack Statement)
                                                       `(discard ,w))))) 0))])
   (Options : Options (o) -> Statement ()
-    [(init ,n ,v) `(discard (spawnM ,(list (mk-nth n) (Value v)) ...))])
+    [(init ,n ,v) `(discard (spawnR ,(list (mk-nth n) (Rvalue v)) ...))])
   (System : System (syst) -> System ()
     [(system (,o* ...) ,ad* ...)
      (let ([as (let go ([sts (append (map ActorDef ad*) (map Options o*))])
@@ -632,7 +664,7 @@
   (terminals
     (+ (string (str)))
     (- (atom (a))))
-  (Value (v)
+  (Rvalue (rv)
     (- (atom a))
     (+ (atom n)))
   (AtomDef (ad)
@@ -662,7 +694,7 @@
                (go (cdr ks) (cdr vs)
                    (cons `(,(car vs) ,(symbol->string (car ks))) acc))]
               [else acc]))))))
-  (Value : Value (v) -> Value ()
+  (Rvalue : Rvalue (rv) -> Rvalue ()
     [(atom ,a) `(atom ,(internalize-atom a))])
   (Statement : Statement (st) -> Statement ())
   (Closure : Closure (cl) -> Closure ())
@@ -679,37 +711,35 @@
     (define (fresh-var)
       (let* ([c var-counter] [v (format "var_~s" c)])
         (set! var-counter (+ c 1)) v)))
-  (Value : Value (v arg) -> * ()
+  (Rvalue : Rvalue (rv arg) -> * ()
     [(arg) (arg)]
     [(atom ,n) (format "mk_atom(~d)" n)]
     [(number ,n) (format "mk_number(~d)" n)]
     [(nth ,n) (format "nth(~d)" n)]
-    [(car ,v) (format "car(~d)" (Value v arg))]
-    [(cdr ,v) (format "cdr(~d)" (Value v arg))]
-    [(cons ,v0 ,v1) (format "mk_cons(~a,~a)" (Value v0 arg) (Value v1 arg))]
-    [,mf (case mf ['yieldM "return yield()"] [else (format "~A()" mf)])]
-    [(,mf ,v* ...)
-     (format "~A(~A)" (case mf
-                        ['set-stateM 'set_stateM]
-                        ['set-clM 'set_clM]
-                        [else mf])
-             (mk-string "," (map (lambda (v) (Value v arg)) v*)))]
+    [(car ,rv) (format "car(~d)" (Rvalue rv arg))]
+    [(cdr ,rv) (format "cdr(~d)" (Rvalue rv arg))]
+    [(cons ,rv0 ,rv1)
+     (format "mk_cons(~a,~a)" (Rvalue rv0 arg) (Rvalue rv1 arg))]
+    [,rf (format "~A()" rf)]
+    [(,rf ,rv* ...)
+     (format "~A(~A)" rf
+             (mk-string "," (map (lambda (rv) (Rvalue rv arg)) rv*)))]
     [(nil) "mk_nil()"]
     [(sys ,s) (format "mk_sys(~A)" (string-upcase (symbol->string s)))]
     [(closure-ref ,cl) (format "mk_cl(~a)" cl)])
   (Cond : Cond (c arg) -> * ()
     [(true) "true"]
-    [(eq ,v0 ,v1) (format "eq(~a,~a)" (Value v0 arg) (Value v1 arg))]
-    [(and ,c0 ,c1) (format "~a && ~a" (Cond v0 arg) (Cond v1 arg))]
-    [(is-cons ,v) (format "is_cons(~a)" (Value v arg))])
+    [(eq ,rv0 ,rv1) (format "eq(~a,~a)" (Rvalue rv0 arg) (Rvalue rv1 arg))]
+    [(and ,c0 ,c1) (format "~a && ~a" (Cond c0 arg) (Cond c1 arg))]
+    [(is-cons ,rv) (format "is_cons(~a)" (Rvalue rv arg))])
   (CondArm : CondArm (ca arg) -> * ()
     [(,c ,st) (values (Cond c arg) (Statement st arg))])
   (Statement : Statement (st arg) -> * ()
-    [(push ,v) (format "push(~a)" (Value v arg))]
+    [(push ,rv) (format "push(~a)" (Rvalue rv arg))]
     [(yield) "return yield()"]
-    [(match-error ,v) (format "return match_error(~A)" (Value v arg))]
-    [(continue ,v0 ,v1)
-     (format "return cont(~A,~A)" (Value v0 arg) (Value v1 arg))]
+    [(match-error ,rv) (format "return match_error(~A)" (Rvalue rv arg))]
+    [(continue ,rv0 ,rv1)
+     (format "return cont(~A,~A)" (Rvalue rv0 arg) (Rvalue rv1 arg))]
     [(cond ,ca* ...)
      (let go ([cas ca*])
        (let-values ([(c st) (CondArm (car cas) arg)])
@@ -718,7 +748,7 @@
            [else (format "if(~a){~a;}else ~a" c st (go (cdr cas)))])))]
     [(and_then ,st0 ,st1)
      (format "~a;~a" (Statement st0 arg) (Statement st1 arg))]
-    [(discard ,v) (Value v arg)]) ; TODO: remove side-effects
+    [(discard ,rv) (Rvalue rv arg)])
   (Closure : Closure (c) -> * ()
     [(unary ,cl ,st)
      (let ([arg (fresh-var)])

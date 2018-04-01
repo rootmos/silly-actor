@@ -91,7 +91,7 @@ void send(actor_id to, struct value v)
     debug("enqueued msg: %d -> %d, %s", m->from, m->to, pretty_print(v));
 }
 
-struct value sendM(struct value to, struct value data)
+struct value sendR(struct value to, struct value data)
 {
     send(cast_aid(to), data);
     return mk_nil();
@@ -117,22 +117,22 @@ struct trampoline value_error()
 }
 
 
-struct value fromM()
+struct value fromR()
 {
     return mk_aid(s.current_msg->from);
 }
 
-struct value msgM()
+struct value msgR()
 {
     return s.current_msg->v;
 }
 
-struct value parentM()
+struct value parentR()
 {
     return mk_aid(current_actor()->parent);
 }
 
-struct value equalM(struct value a, struct value b)
+struct value equalR(struct value a, struct value b)
 {
     if (eq(a, b)) {
         return ATOM_TRUE;
@@ -153,7 +153,7 @@ struct actor* spawn(struct closure* cl, actor_id aid, struct value state)
     insert_actor(a);
 }
 
-struct value spawnM(struct value cl, struct value state)
+struct value spawnR(struct value cl, struct value state)
 {
     actor_id aid = s.next_aid;
     s.next_aid += 1;
@@ -167,24 +167,24 @@ struct value spawnM(struct value cl, struct value state)
 }
 
 
-struct value stateM()
+struct value stateR()
 {
     return current_actor()->state;
 }
 
-struct value set_stateM(struct value state)
+struct value set_stateR(struct value state)
 {
    current_actor()->state = state;
    return mk_nil();
 }
 
-struct value set_clM(struct value cl)
+struct value set_clR(struct value cl)
 {
     current_actor()->cl = cast_cl(cl);
     return mk_nil();
 }
 
-struct value selfM()
+struct value selfR()
 {
     return (struct value){.t=ACTOR_ID,.v=(word_t)(s.current_aid)};
 }
@@ -199,7 +199,7 @@ struct value make_closure(cl_t cl, struct stack* st)
 
 struct trampoline output(struct stack* st, struct value v)
 {
-    dprintf(1, "%s", pretty_print(msgM()));
+    dprintf(1, "%s", pretty_print(msgR()));
     return yield();
 }
 
