@@ -25,6 +25,6 @@ bdwgc:
 
 docker:
 	docker build -t silly-actor .
-	docker run --rm --memory=100m silly-actor
+	docker run --rm --memory=300m silly-actor
 
 .PHONY: tests scheme clean runtime runtime-tests docker bdwgc
