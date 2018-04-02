@@ -358,6 +358,19 @@
        `(>>= ,(Expr e) (,a) (continue ,k ,(mk-anf-val a))))]
     ))
 
+(define-pass inline-values : Lmonad (l) -> Lmonad ()
+  (Value : Value (v ctx) -> Value ()
+    [(anf-val ,av) (cond [(assv av ctx) => cdr] [else v])])
+  (MatchArm : MatchArm (ma ctx) -> MatchArm ()
+    [(,p ,e) `(,p ,(Expr e ctx))])
+  (Expr : Expr (e ctx) -> Expr ()
+    [(>>= (point ,v) (,av) ,e1) (Expr e1 (cons (cons av v) ctx))])
+  (ActorDef : ActorDef (ad) -> ActorDef ()
+    [(define (,bv) ,e) `(define (,bv) ,(Expr e '()))])
+  (System : System (s) -> System ()
+    [(system (,o* ...) ,ad* ...)
+     `(system (,o* ...) ,(map ActorDef ad*) ...)]))
+
 (define-pass match-conts : Lmonad (l) -> Lmonad ()
   (definitions
     (define anf-m-counter 0)
@@ -371,8 +384,6 @@
       (let* ([c mcont-counter]
              [k (string->symbol (format "_cont-m-~s" c))])
         (set! mcont-counter (+ c 1)) k)))
-  ;(Pattern : Pattern (p) -> Pattern ())
-  ;(Value : Value (v) -> Value ())
   (MatchArm : MatchArm (ma k) -> MatchArm ()
     [(,p ,e)
      (let ([a (fresh-anf-m-var)])

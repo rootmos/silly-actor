@@ -9,6 +9,7 @@
                  desugar
                  continuation-constructs
                  to-monad
+                 inline-values
                  match-conts))
 
 (define interpreter-passes '(output-scheme))
