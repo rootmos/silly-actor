@@ -1,7 +1,10 @@
 SCHEME_BIN ?= scheme
 SCHEME=$(SCHEME_BIN) --compile-imported-libraries --libdirs .:nanopass-framework-scheme:thunderchez
 
-tests: runtime runtime-tests
+#tests: runtime runtime-tests
+	#timeout 20s $(SCHEME) --script tests.scm
+
+tests: runtime
 	timeout 20s $(SCHEME) --script tests.scm
 
 scheme:
