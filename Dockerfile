@@ -44,6 +44,8 @@ RUN apk update && apk add \
         make gcc musl-dev \
         ncurses util-linux
 
+WORKDIR /silly-actor
+
 COPY nanopass-framework-scheme nanopass-framework-scheme
 COPY thunderchez thunderchez
 COPY examples examples
@@ -56,5 +58,3 @@ RUN make runtime
 ENV INFO=1
 
 RUN make tests
-
-WORKDIR /silly-actor
