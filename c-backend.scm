@@ -3,8 +3,8 @@
 
 (define (gcc-with-output o)
   (make-c-env "gcc" (list "-g")
-              (list "runtime/include" "bdwgc-dist/include")
-              (list "runtime" "bdwgc-dist/lib") o))
+              (list "runtime/include")
+              (list "runtime") o))
 
 (define gcc-a-out (gcc-with-output "a.out"))
 

@@ -5,12 +5,12 @@ libruntime.a: runtime.o stack.o common.o value.o queue.o
 
 tests: stack_test
 
-stack_test: stack.test.o common.o tests.o
-	gcc $(CC_OPTS) -nostartfiles -o $@ -Wl,-e$@_suite $^
+stack_test: stack.test.o common.o tests.c
+	gcc $(CC_OPTS) -Iinclude -o $@ -DTEST_SUITE=$@_suite $^
 	./$@
 
 %.o: %.c
-	gcc $(CC_OPTS) -I../bdwgc-dist/include -Iinclude -c $<
+	gcc $(CC_OPTS) -Iinclude -c $<
 
 %.test.o: %.c
 	gcc -DTEST -Iinclude -o $@ -c $<

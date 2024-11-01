@@ -1,49 +1,60 @@
-FROM debian:stretch-slim as builder
+FROM alpine:3.20 AS chezscheme
 
-RUN apt-get update && apt-get install -y \
-    curl ncurses-dev xorg-dev make gcc wget git autoconf libtool
+WORKDIR /workdir
 
-RUN mkdir /chez /build
+ADD --checksum=sha256:f5827682fa259c47975ffe078785fb561e4a5c54f764331ef66c32132843685d \
+        https://github.com/cisco/ChezScheme/releases/download/v9.6.4/csv9.6.4.tar.gz \
+        csv.tar.gz
 
-WORKDIR /chez
-ENV CHEZ_VER 9.5
+RUN apk update && apk add \
+        libarchive-tools patch \
+        build-base ncurses-dev libx11-dev util-linux-dev
 
-RUN wget https://github.com/cisco/ChezScheme/archive/v${CHEZ_VER}.tar.gz
-RUN tar xf v${CHEZ_VER}.tar.gz
-WORKDIR /chez/ChezScheme-${CHEZ_VER}
+RUN bsdtar -xf csv.tar.gz --strip-components=1
 
-RUN ./configure --installprefix=/chez-dist
-RUN make -j2 install
+RUN ./configure --temproot=/pkg
+RUN make install
 
-WORKDIR /build
-ADD .git .git
-ADD .gitmodules .
-ADD Makefile .
-RUN git submodule init bdwgc
-RUN git submodule update bdwgc
-RUN make bdwgc
 
-FROM debian:stretch-slim
+FROM alpine:3.20 AS bdwgc
 
-RUN mkdir -p /silly-actor /silly-actor/bdwgc-dist/include
+RUN apk update && apk add \
+        build-base
+
+WORKDIR /workdir
+
+COPY bdwgc .
+
+RUN apk add autoconf
+RUN apk add automake
+RUN apk add libtool
+
+RUN apk add bash
+RUN apk add pkgconf
+RUN ./autogen.sh
+RUN ./configure --enable-static --disable-threads
+RUN make install DESTDIR=/pkg
+
+FROM alpine:3.20
+
+COPY --from=chezscheme /pkg /
+COPY --from=bdwgc /pkg /
+
+RUN apk update && apk add \
+        make gcc musl-dev \
+        ncurses util-linux
+
 WORKDIR /silly-actor
 
-COPY --from=builder /chez-dist /chez-dist
-COPY --from=builder /build/bdwgc-dist bdwgc-dist
-ENV SCHEME_BIN /chez-dist/bin/scheme
+COPY nanopass-framework-scheme nanopass-framework-scheme
+COPY thunderchez thunderchez
+COPY examples examples
+COPY runtime runtime
+COPY Makefile *.scm .
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git make gcc libncurses5 libc-dev
+RUN make runtime
 
-ADD .git .git
-ADD .gitmodules .
-RUN git submodule init thunderchez nanopass-framework-scheme
-RUN git submodule update thunderchez nanopass-framework-scheme
+#ENV TRACE=1
+ENV INFO=1
 
-ADD examples examples
-ADD Makefile .
-ADD runtime runtime
-ADD *.scm ./
-
-ENV INFO 1
-ENTRYPOINT ["make"]
+RUN make tests

@@ -19,3 +19,9 @@ void* random_blob(size_t n)
     fill_with_random(blob, n);
     return blob;
 }
+
+int main() {
+    extern void TEST_SUITE(void);
+    TEST_SUITE();
+    return 0;
+}

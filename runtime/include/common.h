@@ -36,6 +36,6 @@ enum log_level {
     TRACE
 };
 
-enum log_level log_level;
+extern enum log_level log_level;
 
 void set_log_level();

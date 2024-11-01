@@ -7,7 +7,7 @@
     assert(ok); printf("%s - ok\n", __extension__ __FUNCTION__); \
 } while (0)
 
-#define test_suite(n) void n##_test_suite() {
+#define test_suite(n) void n##_test_suite(void) {
 #define test_suite_end() exit(0); }
 
 #define test_case(n) void n##_test_case() { \
