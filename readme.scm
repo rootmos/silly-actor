@@ -2,7 +2,7 @@
   (with-output-to-file "README.md" (lambda ()
     (printf "silly-actor~n")
     (printf "===========~n")
-    (printf "[![Build Status](https://travis-ci.org/rootmos/silly-actor.svg?branch=master)](https://travis-ci.org/rootmos/silly-actor)~n")
+    (printf "[![Build image and run tests](https://github.com/rootmos/silly-actor/actions/workflows/build.yaml/badge.svg)](https://github.com/rootmos/silly-actor/actions/workflows/build.yaml)~n")
     (printf "~n")
 
     (printf "Examples~n")

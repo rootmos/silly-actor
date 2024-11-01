@@ -1,6 +1,6 @@
 silly-actor
 ===========
-[![Build Status](https://travis-ci.org/rootmos/silly-actor.svg?branch=master)](https://travis-ci.org/rootmos/silly-actor)
+[![Build image and run tests](https://github.com/rootmos/silly-actor/actions/workflows/build.yaml/badge.svg)](https://github.com/rootmos/silly-actor/actions/workflows/build.yaml)
 
 Examples
 --------
