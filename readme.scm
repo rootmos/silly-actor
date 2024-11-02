@@ -5,10 +5,16 @@
     (printf "[![Build image and run tests](https://github.com/rootmos/silly-actor/actions/workflows/build.yaml/badge.svg)](https://github.com/rootmos/silly-actor/actions/workflows/build.yaml)~n")
     (printf "~n")
 
+    (printf "A small proof of concept [actor system](https://en.wikipedia.org/wiki/Actor_model), ")
+    (printf "with a [nanopass](https://github.com/nanopass/nanopass-framework-scheme) compiler ")
+    (printf "targeting C with a runtime utilizing a [Boehm-Demers-Weiser](https://www.hboehm.info/gc/) garbage collector.~n")
+    (printf "~n")
+
     (printf "Examples~n")
     (printf "--------~n")
 
     (for-each (lambda (tc)
+      (printf "~n")
       (printf "### Example: ~a~n" (test-case-name tc))
       (printf "```scheme~n")
       (pretty-print (test-case-source tc))
@@ -16,7 +22,7 @@
       (printf "#### Output~n")
       (printf "```scheme~n")
       (pretty-print (test-case-expected tc))
-      (printf "```~n~n")
+      (printf "```~n")
       )
       tcs)
     )

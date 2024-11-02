@@ -2,8 +2,11 @@ silly-actor
 ===========
 [![Build image and run tests](https://github.com/rootmos/silly-actor/actions/workflows/build.yaml/badge.svg)](https://github.com/rootmos/silly-actor/actions/workflows/build.yaml)
 
+A small proof of concept [actor system](https://en.wikipedia.org/wiki/Actor_model), with a [nanopass](https://github.com/nanopass/nanopass-framework-scheme) compiler targeting C with a runtime utilizing a [Boehm-Demers-Weiser](https://www.hboehm.info/gc/) garbage collector.
+
 Examples
 --------
+
 ### Example: 01
 ```scheme
 (system
@@ -230,4 +233,3 @@ Examples
 ((atom . true) (atom . false) (atom . false) (atom . true)
   (atom . false) (atom . true) (atom . false))
 ```
-
